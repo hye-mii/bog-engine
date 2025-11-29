@@ -20,6 +20,14 @@ export class Camera {
     this.updateMatrices();
   }
 
+  public setSize(width: UInt, height: UInt) {
+    this.rect.width = width;
+    this.rect.height = height;
+
+    // Update camera matrices
+    this.updateMatrices();
+  }
+
   public screenToWorld(screenX: number, screenY: number): Vector2 {
     // Convert screen coords to NDC ( -1 to +1 )
     const ndcX = 2 * (screenX / this.rect.width) - 1;

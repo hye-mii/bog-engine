@@ -1,24 +1,26 @@
 import type { BogEngine } from "./bog-engine";
 
 export class InputManager {
+  // Dependencies
   private readonly engine: BogEngine;
   private readonly canvasElement: HTMLCanvasElement;
+  private readonly viewportElement: HTMLDivElement;
 
   // Event states
   private activePointerId: number | null = null;
 
-  // Pointer states
-  public rawClientX: number = 0;
-  public rawClientY: number = 0;
-  public rawScrollDeltaY: number = 0;
-  public isPrimaryButtonDown: boolean = false;
-  public isSecondaryButtonDown: boolean = false;
-  public isAuxiliaryButtonDown: boolean = false;
-
   // Canvas states
   public isCanvasHovered: boolean = true;
 
-  // Keyboard states
+  // Pointer keys and states
+  public isPrimaryButtonDown: boolean = false;
+  public isSecondaryButtonDown: boolean = false;
+  public isAuxiliaryButtonDown: boolean = false;
+  public rawClientX: number = 0;
+  public rawClientY: number = 0;
+  public rawScrollDeltaY: number = 0;
+
+  // Keyboard keys and states
   public isControlKeyDown: boolean = false;
   public isShiftKeyDown: boolean = false;
   public isAltKeyDown: boolean = false;
@@ -26,17 +28,26 @@ export class InputManager {
   constructor(engine: BogEngine, canvasElement: HTMLCanvasElement, viewportElement: HTMLDivElement) {
     this.engine = engine;
     this.canvasElement = canvasElement;
+    this.viewportElement = viewportElement;
+  }
 
+  /**
+   * Initializes the input manager and bind all relevant event listeners
+   */
+  public init() {
     // Bind canvas event listeners
-    this.bindCanvasListeners(canvasElement);
+    this.bindCanvasListeners(this.canvasElement);
 
     // Bind viewport event listeners
-    this.bindViewportListeners(viewportElement);
+    this.bindViewportListeners(this.viewportElement);
 
     // Bind global event listeners
     this.bindGlobalListeners();
   }
 
+  /**
+   * Bind canvas event listeners
+   */
   private bindCanvasListeners(canvasElement: HTMLCanvasElement) {
     // Pointer focus and unfocus
     canvasElement.addEventListener("pointerenter", this.onCanvasPointerEnter);
@@ -45,6 +56,9 @@ export class InputManager {
     canvasElement.addEventListener("blur", this.onCanvasPointerLeave);
   }
 
+  /**
+   * Bind viewport event listeners (pointer/ mouse)
+   */
   private bindViewportListeners(viewportElement: HTMLDivElement) {
     // Pointer focus and unfocus
     viewportElement.addEventListener("pointerenter", this.onViewportPointerEnter);
@@ -61,6 +75,9 @@ export class InputManager {
     viewportElement.addEventListener("wheel", this.onViewportWheel, { passive: false });
   }
 
+  /**
+   * Bind global window and document event listeners (keyboard)
+   */
   private bindGlobalListeners() {
     document.addEventListener("visibilitychange", this.onViewportVisibilityChange);
     window.addEventListener("pointerup", this.onWindowPointerUp);
@@ -73,22 +90,50 @@ export class InputManager {
   // ========================================================
   // ----------------- Helper Functions ---------------------
 
+  /**
+   * Some browsers throw if the pointer isn't captured by this element; safe to ignore
+   */
+  private trySetCapture(element: HTMLElement, pointerId: number) {
+    try {
+      element.setPointerCapture(pointerId);
+    } catch {}
+  }
   private tryReleaseCapture(element: HTMLElement, pointerId: number) {
     try {
       element.releasePointerCapture(pointerId);
     } catch {}
   }
 
-  private trySetCapture(element: HTMLElement, pointerId: number) {
-    try {
-      element.setPointerCapture(pointerId);
-    } catch {}
+  /**
+   * Resets all tracked input state flags
+   * Keep this in sync when adding new input mappings (!sync-inputs)
+   */
+  private resetAllInputState() {
+    this.rawClientX = 0;
+    this.rawClientY = 0;
+    this.rawScrollDeltaY = 0;
+    this.isCanvasHovered = false;
+
+    this.resetPointerInputs();
+    this.resetKeyboardInputs();
   }
 
-  private resetInputState() {
+  /**
+   * Resets only pointer related button states
+   */
+  private resetPointerInputs() {
     this.isPrimaryButtonDown = false;
     this.isSecondaryButtonDown = false;
     this.isAuxiliaryButtonDown = false;
+  }
+
+  /**
+   * Resets only keyboard button states
+   */
+  private resetKeyboardInputs() {
+    this.isControlKeyDown = false;
+    this.isShiftKeyDown = false;
+    this.isAltKeyDown = false;
   }
 
   // ========================================================
@@ -148,8 +193,8 @@ export class InputManager {
       this.activePointerId = null;
     }
 
-    // Reset states
-    this.resetInputState();
+    // And reset pointer inputs
+    this.resetPointerInputs();
   };
 
   private onViewportPointerEnter = (e: PointerEvent) => {
@@ -167,13 +212,13 @@ export class InputManager {
 
   private onViewportVisibilityChange = () => {
     if (document.hidden) {
-      this.resetInputState();
+      this.resetAllInputState();
       this.activePointerId = null;
     }
   };
 
   private onWindowPointerUp = () => {
-    this.resetInputState();
+    this.resetPointerInputs();
     this.activePointerId = null;
   };
 

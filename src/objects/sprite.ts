@@ -1,4 +1,4 @@
-import type { BlendMode, Index, Normalized, SpriteId, UInt } from "../types";
+import type { BlendMode, Index, Normalized, PixelDataRGBA, SpriteId, UInt } from "../types";
 import { generateHashedId } from "../utils/math";
 import { Matrix4 } from "../utils/matrix-4";
 import { Layer } from "./layer";
@@ -12,11 +12,12 @@ export class Sprite {
   public readonly transform: Transform2D;
   public readonly rect: Rect;
   public isDirty: boolean = false;
+  public modelMatrix = new Matrix4();
 
   // Data
+  public readonly flattenedData: PixelDataRGBA;
   private layers: Layer[] = [];
   private modifiers: Modifier[] = [];
-  public modelMatrix = new Matrix4();
 
   // Properties
   private activeLayerIndex: number = 0;
@@ -31,6 +32,7 @@ export class Sprite {
     this.transform.scale.x = 50;
     this.transform.scale.y = 50;
     this.rect = new Rect(0 as Normalized, 0 as Normalized, width, height);
+    this.flattenedData = new Uint8Array(width * height * 4) as PixelDataRGBA;
 
     // Create default layer
     const defaultLayer = new Layer(width, height, "normal");
@@ -70,10 +72,25 @@ export class Sprite {
     this.layers.push(defaultLayer);
 
     this.updateModelMatrix();
+    this.updateFlattenedData();
   }
 
   public get activeLayer() {
     return this.layers[this.activeLayerIndex];
+  }
+
+  public updateFlattenedData() {
+    const spriteSize = this.flattenedData.length;
+
+    this.layers.forEach((layer) => {
+      if (layer.data.length !== spriteSize) {
+        throw Error(`Error parsing data from layer to sprite of sprite id:${this.id}`);
+      }
+
+      for (let i = 0; i < spriteSize; i++) {
+        this.flattenedData[i] = layer.data[i];
+      }
+    });
   }
 
   public setPosition(newX: number, newY: number) {
@@ -98,6 +115,9 @@ export class Sprite {
     if (setActive) {
       this.activeLayerIndex = this.layers.length - 1;
     }
+
+    // Recalculate sprite's flattened data
+    this.updateFlattenedData();
   }
 
   public removeLayerAt(index: Index) {
@@ -114,6 +134,9 @@ export class Sprite {
     if (this.activeLayerIndex >= len) {
       this.activeLayerIndex = len - 1;
     }
+
+    // Recalculate sprite's flattened data
+    this.updateFlattenedData();
   }
 
   public removeLastLayer() {

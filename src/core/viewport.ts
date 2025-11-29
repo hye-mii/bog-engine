@@ -24,15 +24,14 @@ export class Viewport {
     return this._height;
   }
 
+  /**
+   * Resize the viewport and update the camera's projection matrices
+   */
   public resize(width: UInt, height: UInt) {
     this._width = width;
     this._height = height;
 
-    // Update camera to take the correct full viewport width and height
-    this.camera.rect.width = width;
-    this.camera.rect.height = height;
-
-    // Update camera matrices
-    this.camera.updateMatrices();
+    // Resize camera to take the correct full viewport width and height
+    this.camera.setSize(width, height);
   }
 }

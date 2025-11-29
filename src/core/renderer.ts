@@ -1,4 +1,4 @@
-import type { SpriteId } from "../types";
+import type { PixelDataRGBA, SpriteId } from "../types";
 import type { Scene } from "./scene";
 import type { Viewport } from "./viewport";
 import type { Sprite } from "../objects/sprite";
@@ -9,44 +9,63 @@ import backgroundShader from "../shaders/background-shader.wgsl?raw";
 import spriteShader from "../shaders/sprite-shader.wgsl?raw";
 
 export class WebGPURenderer {
+  // Renderer states
   private initialised: boolean = false;
   private device!: GPUDevice;
   private context!: GPUCanvasContext;
   private format!: GPUTextureFormat;
 
-  // Global resouces
+  // Global resources
   private quadVertexBuffer!: GPUBuffer;
   private globalUniformBuffer!: GPUBuffer;
   private globalBindGroupLayout!: GPUBindGroupLayout;
   private globalBindGroup!: GPUBindGroup;
 
-  // Background resouces
+  // Background resources
   private backgroundUniformBuffer!: GPUBuffer;
   private backgroundPipeline!: GPURenderPipeline;
   private backgroundBindGroupLayout!: GPUBindGroupLayout;
   private backgroundPipelineLayout!: GPUPipelineLayout;
   private backgroundBindGroup!: GPUBindGroup;
 
-  // Sprite resouces
+  // Sprite resources
   private gpuSprites: Map<string, GPUSprite> = new Map();
   private sharedSpritePipeline!: GPURenderPipeline;
   private sharedSpriteBindGroupLayout!: GPUBindGroupLayout;
   private sharedSpritePipelineLayout!: GPUPipelineLayout;
 
+  /**
+   * Renderer is initialized async via init()
+   */
+  constructor() {}
+
+  /**
+   * Initialize the WebGPU renderer and all required resources
+   *
+   * Steps:
+   * 1. Request GPU adapter and device
+   * 2. Configure canvas context
+   * 3. Create fullscreen quad buffer
+   * 4. Setup resources for global, background, and sprite
+   */
   public async init(canvasElement: HTMLCanvasElement) {
+    // WebGPU not supported in this browser
     if (!navigator.gpu) {
       throw new Error("WebGPU is not supported in this browser.");
     }
 
+    // WebGPU not supported in this browser
     const adapter = await navigator.gpu.requestAdapter();
     if (!adapter) {
       throw new Error("Failed to get a GPU adapter.");
     }
 
+    // Request GPU adapter
     this.device = await adapter.requestDevice();
     this.context = canvasElement.getContext("webgpu")!;
     this.format = navigator.gpu.getPreferredCanvasFormat();
 
+    // Configure context for rendering
     this.context.configure({
       device: this.device,
       format: this.format,
@@ -54,12 +73,7 @@ export class WebGPURenderer {
     });
 
     // Create fullscreen quad buffer
-    const quadVertices = new Float32Array([-1, -1, 0, 1, 1, -1, 1, 1, -1, 1, 0, 0, -1, 1, 0, 0, 1, -1, 1, 1, 1, 1, 1, 0]);
-    this.quadVertexBuffer = this.device.createBuffer({
-      size: quadVertices.byteLength,
-      usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-    });
-    this.device.queue.writeBuffer(this.quadVertexBuffer, 0, quadVertices);
+    this.quadVertexBuffer = WebGPURenderer.setupQuadBuffer(this.device);
 
     // Setup global resources
     const { globalUniformBuffer, globalBindGroupLayout, globalBindGroup } = WebGPURenderer.createGlobalBuffer(this.device);
@@ -90,9 +104,12 @@ export class WebGPURenderer {
     this.initialised = true;
   }
 
+  /**
+   * Create a GPU sprite for the given sprite object and add it to the renderer GPU sprite map
+   */
   public createGPUSprite(sprite: Sprite) {
     if (this.gpuSprites.has(sprite.id)) {
-      console.error("GPU sprite already exists for this sprite!");
+      console.error("GPU sprite already exists for this sprite.");
       return;
     }
 
@@ -100,27 +117,33 @@ export class WebGPURenderer {
     this.gpuSprites.set(sprite.id, newGPUSprite);
   }
 
+  /**
+   * Remove the GPU sprite with the given ID from the renderer's GPU sprite map
+   */
   public destroyGPUSprite(id: SpriteId) {
     this.gpuSprites.delete(id);
   }
 
+  /**
+   * Render the given scene to the viewport
+   */
   public render(viewport: Viewport, scene: Scene) {
     if (!this.initialised) {
       console.log("Renderer is not initialized!");
       return;
     }
 
-    // Update global buffer
-    this.updateGlobalBuffer(viewport);
+    // Update global uniform buffer with viewport/camera data
+    this.uploadGlobalBuffer(viewport);
 
-    // Get view and encoder
+    // Acquire current swap chain texture and create encoder/pass
     const view = this.context.getCurrentTexture().createView();
     const encoder = this.device.createCommandEncoder();
     const pass = encoder.beginRenderPass({
       colorAttachments: [
         {
           view,
-          clearValue: { r: 1, g: 0, b: 1, a: 1 },
+          clearValue: { r: 1, g: 0, b: 1, a: 1 }, // pink color for debugging
           loadOp: "clear",
           storeOp: "store",
         },
@@ -145,81 +168,58 @@ export class WebGPURenderer {
         throw Error(`No GPU sprite found for sprite id:${sprite.id}`);
       }
 
+      // Update GPU sprite uniform if dirty
       if (sprite.isDirty) {
         gpuSprite.updateUniform(this.device, sprite.modelMatrix.data);
+        sprite.isDirty = false;
       }
 
-      this.writeTexture(sprite.rect.width, sprite.rect.height, sprite.activeLayer.data, gpuSprite.texture);
+      // Upload sprite texture to GPU
+      this.uploadSpriteTexture(gpuSprite.texture, sprite.flattenedData, sprite.rect.width, sprite.rect.height);
 
       pass.setBindGroup(1, gpuSprite.bindGroup);
       pass.draw(6);
     }
 
-    // Submit
+    // Submit commands to GPU
     pass.end();
     this.device.queue.submit([encoder.finish()]);
   }
 
-  private writeTexture(width: number, height: number, data: Uint8ClampedArray, texture: GPUTexture) {
+  /**
+   * Upload pixel data to the GPU texture
+   */
+  private uploadSpriteTexture(texture: GPUTexture, pixelData: PixelDataRGBA, width: number, height: number) {
     this.device.queue.writeTexture(
       { texture: texture },
-      data as GPUAllowSharedBufferSource,
+      pixelData as GPUAllowSharedBufferSource,
       {
         offset: 0,
         bytesPerRow: width * 4,
         rowsPerImage: height,
       },
       {
-        width,
-        height,
+        width: width,
+        height: height,
         depthOrArrayLayers: 1,
       }
     );
   }
 
-  private updateGlobalBuffer(viewport: Viewport) {
+  /**
+   * Uploads global uniform buffer for the current viewport and camera
+   */
+  private uploadGlobalBuffer(viewport: Viewport) {
     const camera = viewport.camera;
 
     const cameraBufferSize = 144;
     const globalData = new Float32Array(cameraBufferSize / 4);
 
     // Camera view projection matrix
-    const viewProjectionData = camera.viewProjectionMatrix.data;
-    globalData[0] = viewProjectionData[0];
-    globalData[1] = viewProjectionData[1];
-    globalData[2] = viewProjectionData[2];
-    globalData[3] = viewProjectionData[3];
-    globalData[4] = viewProjectionData[4];
-    globalData[5] = viewProjectionData[5];
-    globalData[6] = viewProjectionData[6];
-    globalData[7] = viewProjectionData[7];
-    globalData[8] = viewProjectionData[8];
-    globalData[9] = viewProjectionData[9];
-    globalData[10] = viewProjectionData[10];
-    globalData[11] = viewProjectionData[11];
-    globalData[12] = viewProjectionData[12];
-    globalData[13] = viewProjectionData[13];
-    globalData[14] = viewProjectionData[14];
-    globalData[15] = viewProjectionData[15];
+    globalData.set(camera.viewProjectionMatrix.data, 0);
 
     // Camera inverse view projection matrix
-    const inverseViewProjectionData = camera.invViewProjectionMatrix.data;
-    globalData[16] = inverseViewProjectionData[0];
-    globalData[17] = inverseViewProjectionData[1];
-    globalData[18] = inverseViewProjectionData[2];
-    globalData[19] = inverseViewProjectionData[3];
-    globalData[20] = inverseViewProjectionData[4];
-    globalData[21] = inverseViewProjectionData[5];
-    globalData[22] = inverseViewProjectionData[6];
-    globalData[23] = inverseViewProjectionData[7];
-    globalData[24] = inverseViewProjectionData[8];
-    globalData[25] = inverseViewProjectionData[9];
-    globalData[26] = inverseViewProjectionData[10];
-    globalData[27] = inverseViewProjectionData[11];
-    globalData[28] = inverseViewProjectionData[12];
-    globalData[29] = inverseViewProjectionData[13];
-    globalData[30] = inverseViewProjectionData[14];
-    globalData[31] = inverseViewProjectionData[15];
+    globalData.set(camera.invViewProjectionMatrix.data, 16);
 
     // Screen size
     globalData[32] = viewport.width;
@@ -232,9 +232,29 @@ export class WebGPURenderer {
   }
 
   // ========================================================
-  // ----------------- Helper Functions ---------------------
+  // -------------- Private Static Helpers ------------------
 
-  private static createGlobalBuffer(device: GPUDevice) {
+  /**
+   * Create full quad vertex buffer and upload its data to the GPU device
+   */
+  private static setupQuadBuffer(device: GPUDevice) {
+    const quadVertices = new Float32Array([-1, -1, 0, 1, 1, -1, 1, 1, -1, 1, 0, 0, -1, 1, 0, 0, 1, -1, 1, 1, 1, 1, 1, 0]);
+    const outBuffer = device.createBuffer({
+      size: quadVertices.byteLength,
+      usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+    });
+    device.queue.writeBuffer(outBuffer, 0, quadVertices);
+    return outBuffer;
+  }
+
+  /**
+   * Create GPU resources for global uniforms
+   */
+  private static createGlobalBuffer(device: GPUDevice): {
+    globalUniformBuffer: GPUBuffer;
+    globalBindGroupLayout: GPUBindGroupLayout;
+    globalBindGroup: GPUBindGroup;
+  } {
     const cameraBufferSize = 144;
     const globalUniformBuffer = device.createBuffer({
       size: cameraBufferSize,
@@ -261,7 +281,20 @@ export class WebGPURenderer {
     };
   }
 
-  private static createBackgroundPassResources(device: GPUDevice, format: GPUTextureFormat, globalBindGroupLayout: GPUBindGroupLayout) {
+  /**
+   * Create background pass GPU resources
+   */
+  private static createBackgroundPassResources(
+    device: GPUDevice,
+    format: GPUTextureFormat,
+    globalBindGroupLayout: GPUBindGroupLayout
+  ): {
+    backgroundUniformBuffer: GPUBuffer;
+    backgroundPipeline: GPURenderPipeline;
+    backgroundBindGroupLayout: GPUBindGroupLayout;
+    backgroundPipelineLayout: GPUPipelineLayout;
+    backgroundBindGroup: GPUBindGroup;
+  } {
     const backgroundBufferSize = 48;
 
     // Create a background buffer
@@ -370,7 +403,18 @@ export class WebGPURenderer {
     };
   }
 
-  private static createSharedSpriteResources(device: GPUDevice, format: GPUTextureFormat, globalBindGroupLayout: GPUBindGroupLayout) {
+  /**
+   * Create GPU resources for the sprite rendering pass
+   */
+  private static createSharedSpriteResources(
+    device: GPUDevice,
+    format: GPUTextureFormat,
+    globalBindGroupLayout: GPUBindGroupLayout
+  ): {
+    sharedSpriteBindGroupLayout: GPUBindGroupLayout;
+    sharedSpritePipelineLayout: GPUPipelineLayout;
+    sharedSpritePipeline: GPURenderPipeline;
+  } {
     const sharedSpriteBindGroupLayout = device.createBindGroupLayout({
       entries: [
         {

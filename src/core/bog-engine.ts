@@ -7,7 +7,6 @@ import { Viewport } from "./viewport";
 import { Scene } from "./scene";
 import { Sprite } from "../objects/sprite";
 import { Vector2 } from "../utils/vector-2";
-import { seededFromUUID } from "../utils/math";
 
 export class BogEngine {
   private readonly settings: SettingsType;
@@ -44,15 +43,7 @@ export class BogEngine {
     this.input = new InputManager(this, this.canvasElement, this.viewportElement);
     this.ui = new UIManager(this, this.canvasElement);
     this.viewport = new Viewport(this, this.canvasElement.width as UInt, this.canvasElement.height as UInt);
-    this.scene = new Scene();
-
-    // Bind events to the scene
-    this.scene.onSpriteAdded((sprite: Sprite) => {
-      this.renderer.createGPUSprite(sprite);
-    });
-    this.scene.onSpriteRemoved((id: SpriteId) => {
-      this.renderer.destroyGPUSprite(id);
-    });
+    this.scene = new Scene(this.renderer);
 
     // Attach canvas to viewport
     this.viewportElement.appendChild(this.canvasElement);
@@ -61,6 +52,9 @@ export class BogEngine {
   public async init() {
     // Initialise renderer
     await this.renderer.init(this.canvasElement);
+
+    // Initialise input manager
+    this.input.init();
 
     // Add a default scene
     this.scene.addSprite(16 as UInt, 16 as UInt);
