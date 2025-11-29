@@ -1,0 +1,34 @@
+:root {
+  --color-bg-primary: #353535ff;
+  --color-primary: #e7e8eb;
+}
+
+body {
+  display: flex;
+  flex-direction: row;
+  overflow: visible;
+
+  width: 100vw;
+  height: 100vh;
+  margin: 0;
+}
+
+#viewport {
+  display: flex;
+  overflow: visible;
+
+  background-color: var(--color-bg-primary);
+  color: var(--color-primary);
+  width: 100%;
+  height: 100%;
+}
+
+.main-canvas {
+  display: block;
+  position: relative;
+  touch-action: none;
+  image-rendering: pixelated;
+
+  width: 100%;
+  height: 100%;
+}
