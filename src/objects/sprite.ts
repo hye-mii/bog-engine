@@ -1,15 +1,16 @@
 import type { BlendMode, Index, Normalized, PixelDataRGBA, SpriteId, UInt } from "../types";
 import { generateHashedId } from "../utils/math";
 import { Matrix4 } from "../utils/matrix-4";
+import type { Vector2 } from "../utils/vector-2";
 import { Layer } from "./layer";
 import { Modifier } from "./modifier";
 import { Rect } from "./rect";
-import { Transform2D } from "./transform-2d";
+import { Transform } from "./transform";
 
 export class Sprite {
   public readonly id: SpriteId;
   public readonly name: string;
-  public readonly transform: Transform2D;
+  public readonly transform: Transform = new Transform();
   public readonly rect: Rect;
   public isDirty: boolean = false;
   public modelMatrix = new Matrix4();
@@ -23,16 +24,15 @@ export class Sprite {
   private activeLayerIndex: number = 0;
   private opacity: number = 1;
   private visible: boolean = true;
-  private zIndex: number = 0;
+  public zIndex: number = 0;
 
-  constructor(width: UInt, height: UInt) {
+  constructor(width: UInt, height: UInt, x: number, y: number) {
     this.id = generateHashedId(6) as SpriteId;
     this.name = `Sprite_${this.id}`;
-    this.transform = new Transform2D();
-    this.transform.scale.x = 50;
-    this.transform.scale.y = 50;
     this.rect = new Rect(0 as Normalized, 0 as Normalized, width, height);
     this.flattenedData = new Uint8Array(width * height * 4) as PixelDataRGBA;
+    this.transform.position.x = x;
+    this.transform.position.y = y;
 
     // Create default layer
     const defaultLayer = new Layer(width, height, "normal");
@@ -75,10 +75,6 @@ export class Sprite {
     this.updateFlattenedData();
   }
 
-  public get activeLayer() {
-    return this.layers[this.activeLayerIndex];
-  }
-
   public updateFlattenedData() {
     const spriteSize = this.flattenedData.length;
 
@@ -101,10 +97,27 @@ export class Sprite {
   }
 
   public updateModelMatrix() {
-    this.modelMatrix.identity();
-    this.modelMatrix.translateXY(this.transform.position.x, this.transform.position.y);
-    this.modelMatrix.rotateZ(this.transform.rotation);
-    this.modelMatrix.scale(this.transform.scale.x, this.transform.scale.y, 1);
+    const modelMatrix = this.modelMatrix;
+    const transform = this.transform;
+    const rect = this.rect;
+
+    // Pivot offset x, and y are normalised ( 0 to 1 )
+    const pivotOffsetX = rect.x * rect.width;
+    const pivotOffsetY = rect.y * rect.height;
+
+    // World screen scaling
+    const scaleX = rect.width * transform.scale.x;
+    const scaleY = rect.height * transform.scale.y;
+
+    // Apply Pivot -> Scale -> Rotate -> Translate
+    modelMatrix.identity();
+    modelMatrix.translateXY(-pivotOffsetX, -pivotOffsetY);
+    modelMatrix.scaleXY(scaleX, scaleY);
+
+    // ~ quaternion에서 Z축 rad 값 가져오는 함수 만들어야 함
+    // modelMatrix.rotateZ(...);
+
+    modelMatrix.translate(transform.position.x + transform.pivot.x, transform.position.y + transform.pivot.y, 0);
   }
 
   public addLayer(blendMode: BlendMode, setActive: boolean = true) {
@@ -141,5 +154,12 @@ export class Sprite {
 
   public removeLastLayer() {
     this.removeLayerAt((this.layers.length - 1) as Index);
+  }
+
+  public contains(position: Vector2) {
+    const spritePosition = this.transform.position;
+    const isInXBounds = position.x >= spritePosition.x && position.x < spritePosition.x + this.rect.width;
+    const isInYBounds = position.y >= spritePosition.y && position.y < spritePosition.y + this.rect.height;
+    return isInXBounds && isInYBounds;
   }
 }

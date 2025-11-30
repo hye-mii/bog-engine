@@ -1,23 +1,24 @@
 import type { UInt } from "../types";
-import { BogEngine } from "./bog-engine";
 import { Camera } from "../objects/camera";
 import { CameraController } from "../objects/camera-controller";
 
 export class Viewport {
-  private readonly engine: BogEngine;
   private _width: UInt;
   private _height: UInt;
+
   public readonly camera: Camera;
   public readonly cameraController: CameraController;
 
-  constructor(engine: BogEngine, width: UInt, height: UInt) {
-    this.engine = engine;
-    this._width = width;
-    this._height = height;
-    this.camera = new Camera(width, height);
-    this.cameraController = new CameraController(engine, this.camera);
+  constructor(width: number, height: number, cameraSize: number) {
+    this._width = Math.max(1, width) as UInt;
+    this._height = Math.max(1, height) as UInt;
+    this.camera = new Camera(this, cameraSize as UInt, cameraSize as UInt);
+    this.cameraController = new CameraController(this, this.camera);
+
+    // Update camera's aspect ratio
+    this.camera.setAspect(this._width / this._height);
   }
-  public get width() {
+  public get width(): UInt {
     return this._width;
   }
   public get height(): UInt {
@@ -27,11 +28,11 @@ export class Viewport {
   /**
    * Resize the viewport and update the camera's projection matrices
    */
-  public resize(width: UInt, height: UInt) {
-    this._width = width;
-    this._height = height;
+  public resize(width: number, height: number) {
+    this._width = Math.max(1, width) as UInt;
+    this._height = Math.max(1, height) as UInt;
 
-    // Resize camera to take the correct full viewport width and height
-    this.camera.setSize(width, height);
+    // Set camera's new aspect ratio
+    this.camera.setAspect(this._width / this._height);
   }
 }

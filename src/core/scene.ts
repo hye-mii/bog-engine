@@ -1,39 +1,31 @@
 import type { SpriteId, UInt } from "../types";
 import { Sprite } from "../objects/sprite";
-import type { WebGPURenderer } from "./renderer";
+import { Vector2 } from "../utils/vector-2";
 
 export class Scene {
   public sprites = new Map<string, Sprite>();
 
-  private events = {
-    spriteAdded: new Set<(sprite: Sprite) => void>(),
-    spriteRemoved: new Set<(id: SpriteId) => void>(),
-  };
+  // Event listeners
+  private onSpriteAddedCallbacc: ((sprite: Sprite) => void)[] = [];
+  private onSpriteRemovedCallbacc: ((id: SpriteId) => void)[] = [];
 
-  constructor(renderer: WebGPURenderer) {
-    this.onSpriteAdded((sprite: Sprite) => {
-      renderer.createGPUSprite(sprite);
-    });
-    this.onSpriteRemoved((id: SpriteId) => {
-      renderer.destroyGPUSprite(id);
-    });
+  constructor() {}
+
+  public addSpriteAddedListener(callback: (sprite: Sprite) => void) {
+    this.onSpriteAddedCallbacc.push(callback);
   }
 
-  public onSpriteAdded(fn: (sprite: Sprite) => void) {
-    this.events.spriteAdded.add(fn);
+  public addSpriteRemovedListener(callback: (id: SpriteId) => void) {
+    this.onSpriteRemovedCallbacc.push(callback);
   }
 
-  public onSpriteRemoved(fn: (id: SpriteId) => void) {
-    this.events.spriteRemoved.add(fn);
-  }
-
-  public addSprite(width: UInt, height: UInt): SpriteId {
+  public addSprite(width: UInt, height: UInt, x: number, y: number): SpriteId {
     // Add a new sprite
-    const sprite = new Sprite(width, height);
+    const sprite = new Sprite(width, height, x, y);
     this.sprites.set(sprite.id, sprite);
 
     // Notify listeners
-    this.events.spriteAdded.forEach((fn) => fn(sprite));
+    this.onSpriteAddedCallbacc.forEach((fn) => fn(sprite));
     return sprite.id;
   }
 
@@ -44,10 +36,18 @@ export class Scene {
     }
 
     // Notify listeners
-    this.events.spriteRemoved.forEach((fn) => fn(sprite.id));
+    this.onSpriteRemovedCallbacc.forEach((fn) => fn(sprite.id));
 
     // Remove the sprite
     this.sprites.delete(sprite.id);
     return true;
+  }
+
+  public getSpriteAtWorld(position: Vector2): Sprite | undefined {
+    const sortedSprites = [...this.sprites.values()].sort((a, b) => b.zIndex - a.zIndex);
+    for (const sprite of sortedSprites) {
+      if (sprite.contains(position)) return sprite;
+    }
+    return undefined;
   }
 }

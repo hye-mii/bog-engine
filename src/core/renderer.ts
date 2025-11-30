@@ -33,6 +33,7 @@ export class WebGPURenderer {
   private sharedSpritePipeline!: GPURenderPipeline;
   private sharedSpriteBindGroupLayout!: GPUBindGroupLayout;
   private sharedSpritePipelineLayout!: GPUPipelineLayout;
+  private sharedSpriteBuffer!: GPUBuffer;
 
   /**
    * Renderer is initialized async via init()
@@ -91,14 +92,12 @@ export class WebGPURenderer {
     this.backgroundBindGroup = backgroundBindGroup;
 
     // Setup sprite resources
-    const { sharedSpriteBindGroupLayout, sharedSpritePipelineLayout, sharedSpritePipeline } = WebGPURenderer.createSharedSpriteResources(
-      this.device,
-      this.format,
-      this.globalBindGroupLayout
-    );
+    const { sharedSpriteBindGroupLayout, sharedSpritePipelineLayout, sharedSpritePipeline, sharedSpriteBuffer } =
+      WebGPURenderer.createSharedSpriteResources(this.device, this.format, this.globalBindGroupLayout);
     this.sharedSpriteBindGroupLayout = sharedSpriteBindGroupLayout;
     this.sharedSpritePipelineLayout = sharedSpritePipelineLayout;
     this.sharedSpritePipeline = sharedSpritePipeline;
+    this.sharedSpriteBuffer = sharedSpriteBuffer;
 
     // The renderer is ready
     this.initialised = true;
@@ -160,7 +159,7 @@ export class WebGPURenderer {
     // Sprites pass
     pass.setPipeline(this.sharedSpritePipeline);
     pass.setBindGroup(0, this.globalBindGroup);
-    pass.setVertexBuffer(0, this.quadVertexBuffer);
+    pass.setVertexBuffer(0, this.sharedSpriteBuffer);
 
     for (const [key, sprite] of scene.sprites) {
       const gpuSprite = this.gpuSprites.get(sprite.id);
@@ -225,8 +224,9 @@ export class WebGPURenderer {
     globalData[32] = viewport.width;
     globalData[33] = viewport.height;
 
-    // World unit per pixel (camera's inverse zoom)
-    globalData[34] = 1 / camera.zoom;
+    // World unit per pixel
+    const WU = viewport.width / camera.width;
+    globalData[34] = WU * camera.zoom;
 
     this.device.queue.writeBuffer(this.globalUniformBuffer, 0, globalData.buffer);
   }
@@ -385,11 +385,11 @@ export class WebGPURenderer {
     backgroundData[6] = 0.12;
     backgroundData[7] = 1.0;
 
-    // gridSize
-    backgroundData[8] = 64.0;
-    backgroundData[9] = 64.0;
+    // gridSize in world unit
+    backgroundData[8] = 16.0;
+    backgroundData[9] = 16.0;
 
-    // lineThickness
+    // lineThickness in pixels
     backgroundData[10] = 1;
 
     device.queue.writeBuffer(backgroundUniformBuffer, 0, backgroundData.buffer);
@@ -414,6 +414,7 @@ export class WebGPURenderer {
     sharedSpriteBindGroupLayout: GPUBindGroupLayout;
     sharedSpritePipelineLayout: GPUPipelineLayout;
     sharedSpritePipeline: GPURenderPipeline;
+    sharedSpriteBuffer: GPUBuffer;
   } {
     const sharedSpriteBindGroupLayout = device.createBindGroupLayout({
       entries: [
@@ -493,11 +494,18 @@ export class WebGPURenderer {
       },
       primitive: { topology: "triangle-list" },
     });
+    const spriteVertices = new Float32Array([0, 0, 0, 1, 1, 0, 1, 1, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0, 1, 1, 1, 1, 1, 0]);
+    const sharedSpriteBuffer = device.createBuffer({
+      size: spriteVertices.byteLength,
+      usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+    });
+    device.queue.writeBuffer(sharedSpriteBuffer, 0, spriteVertices);
 
     return {
       sharedSpriteBindGroupLayout,
       sharedSpritePipelineLayout,
       sharedSpritePipeline,
+      sharedSpriteBuffer,
     };
   }
 }

@@ -8,6 +8,14 @@ import { Scene } from "./scene";
 import { Sprite } from "../objects/sprite";
 import { Vector2 } from "../utils/vector-2";
 
+// Custom comments expressions used in the project
+// ! notice
+// ? question
+// * sync
+// ~ temporary
+// > todo
+// // Redacted
+
 export class BogEngine {
   private readonly settings: SettingsType;
   public readonly viewportElement: HTMLDivElement;
@@ -28,42 +36,46 @@ export class BogEngine {
   private isPanning: boolean = false;
   private panMousePosition: Vector2 = new Vector2(0, 0);
 
-  // ! temp: ..
-  private readonly tempSprites: Sprite[] = [];
+  // ~ temp
+  private isSpriteFocused: boolean = false;
 
   constructor(settings: SettingsType, viewportElement: HTMLDivElement) {
-    // Store
+    // ------ Store initial configuration ------
     this.settings = settings;
     this.viewportElement = viewportElement;
-    this.canvasElement = this.createCanvasElement();
-
-    // Instantiate Components
-    this.tweenScheduler = new TweenScheduler();
-    this.renderer = new WebGPURenderer();
-    this.input = new InputManager(this, this.canvasElement, this.viewportElement);
-    this.ui = new UIManager(this, this.canvasElement);
-    this.viewport = new Viewport(this, this.canvasElement.width as UInt, this.canvasElement.height as UInt);
-    this.scene = new Scene(this.renderer);
+    this.canvasElement = BogEngine.createCanvasElement();
 
     // Attach canvas to viewport
     this.viewportElement.appendChild(this.canvasElement);
+
+    // ------ Instantiate Core Components ------
+    this.tweenScheduler = new TweenScheduler();
+    this.renderer = new WebGPURenderer();
+    this.input = new InputManager(this.canvasElement, this.viewportElement);
+    this.ui = new UIManager();
+    this.viewport = new Viewport(this.canvasElement.width, this.canvasElement.height, settings.camera.size);
+    this.scene = new Scene();
   }
 
   public async init() {
     // Initialise renderer
     await this.renderer.init(this.canvasElement);
 
+    // Bind Event Listeners
+    BogEngine.bindListeners(this);
+
     // Initialise input manager
     this.input.init();
 
     // Add a default scene
-    this.scene.addSprite(16 as UInt, 16 as UInt);
+    this.scene.addSprite(16 as UInt, 16 as UInt, 0, 0);
+    this.scene.addSprite(16 as UInt, 16 as UInt, 0, 1);
 
     // Start main loop
     requestAnimationFrame(this.loop);
   }
 
-  private createCanvasElement() {
+  private static createCanvasElement() {
     const canvasElement = document.createElement("canvas");
     canvasElement.id = "main-canvas";
     canvasElement.classList.add("main-canvas");
@@ -72,31 +84,32 @@ export class BogEngine {
     return canvasElement;
   }
 
-  public updateViewport() {
-    // Get new canvas size
-    const width = window.innerWidth;
-    const height = window.innerHeight;
+  private static bindListeners(engine: BogEngine) {
+    // Setup logic to handle window resizing
+    engine.input.addResizeListener(() => {
+      // Get new canvas size from the window
+      const width = window.innerWidth;
+      const height = window.innerHeight;
 
-    // Update canvas
-    this.canvasElement.width = width;
-    this.canvasElement.height = height;
+      // Update canvas element
+      engine.canvasElement.width = width;
+      engine.canvasElement.height = height;
 
-    // Inform scene
-    this.viewport.resize(width as UInt, height as UInt);
+      // Resize viewport
+      engine.viewport.resize(width, height);
+    });
+
+    // Bind event listeners to inform renderer to create and remove GPU Sprites
+    engine.scene.addSpriteAddedListener((sprite: Sprite) => {
+      engine.renderer.createGPUSprite(sprite);
+    });
+    engine.scene.addSpriteRemovedListener((id: SpriteId) => {
+      engine.renderer.destroyGPUSprite(id);
+    });
   }
 
   private loop = () => {
     const dt = 0.016;
-
-    // ! temp: ..
-    let odd = 0;
-    this.tempSprites.forEach((sprite) => {
-      let speed = 0.8;
-      if (odd % 2 === 0) speed *= -1;
-      odd++;
-      sprite.transform.rotation += dt * speed;
-      sprite.updateModelMatrix();
-    });
 
     //
     this.viewport.cameraController.update(dt);
@@ -131,6 +144,9 @@ export class BogEngine {
     const isShiftKeyDown = this.input.isShiftKeyDown;
     const isAltKeyDown = this.input.isAltKeyDown;
 
+    const doubleClick = this.input.doubleClick;
+    this.input.doubleClick = false;
+
     const pixelX = rawClientX - canvasRectLeft;
     const pixelY = rawClientY - canvasRectTop;
 
@@ -163,7 +179,7 @@ export class BogEngine {
         const deltaY = this.mousePosition.y - this.panMousePosition.y;
 
         // Apply pan
-        controller.moveCamera(deltaX, deltaY);
+        controller.moveCamera(deltaX, -deltaY);
 
         // Update anchor for next frame
         this.panMousePosition.x = this.mousePosition.x;
@@ -171,6 +187,21 @@ export class BogEngine {
       }
     } else {
       this.isPanning = false;
+    }
+
+    // Double click
+    if (doubleClick) {
+      const worldPos = this.viewport.camera.screenToWorld(this.mousePosition.x, this.mousePosition.y);
+      console.log(`x:${worldPos.x} y:${worldPos.y}`);
+
+      // const spriteId = this.scene.addSprite(16 as UInt, 16 as UInt, worldPos.x / 16, worldPos.y / 16);
+      // const newSprite = this.scene.sprites.get(spriteId)!;
+
+      // const sprite = this.scene.getSpriteAtWorld(this.viewport.camera.screenToWorld(this.mousePosition.x, this.mousePosition.y));
+      // if (sprite) {
+      //   this.isSpriteFocused = true;
+      //   sprite.addLayer("normal");
+      // }
     }
   }
 }

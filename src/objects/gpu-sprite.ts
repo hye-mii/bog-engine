@@ -1,3 +1,4 @@
+import type { PixelDataBGRA } from "../types";
 import type { Sprite } from "./sprite";
 
 export class GPUSprite {
@@ -12,7 +13,7 @@ export class GPUSprite {
     this.id = sprite.id;
 
     this.sampler = GPUSprite.createSampler(device);
-    this.texture = GPUSprite.createTexture(device, sprite.rect.width, sprite.rect.height, sprite.activeLayer.data);
+    this.texture = GPUSprite.createTexture(device, sprite.rect.width, sprite.rect.height);
     this.textureView = GPUSprite.createTextureView(this.texture);
     this.uniformBuffer = GPUSprite.createUniformBuffer(device);
     this.bindGroup = GPUSprite.createBindGroup(device, sharedBindGroupLayout, this.uniformBuffer, this.texture, this.sampler);
@@ -42,7 +43,7 @@ export class GPUSprite {
     device.queue.writeBuffer(this.uniformBuffer, 0, bufferData.buffer);
   }
 
-  private static createTexture(device: GPUDevice, width: number, height: number, data: Uint8ClampedArray): GPUTexture {
+  private static createTexture(device: GPUDevice, width: number, height: number): GPUTexture {
     const outTexture = device.createTexture({
       size: [width, height, 1],
       format: "rgba8unorm",

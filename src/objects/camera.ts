@@ -1,56 +1,79 @@
-import type { Normalized, UInt } from "../types";
+import type { UInt } from "../types";
 import { Vector2 } from "../utils/vector-2";
-import { Vector4 } from "../utils/vector-4";
 import { Matrix4 } from "../utils/matrix-4";
 import { Transform } from "./transform";
-import { Rect } from "./rect";
+import { Viewport } from "../core/viewport";
 
 export class Camera {
+  private readonly viewport: Viewport;
+
   public readonly transform: Transform = new Transform();
-  public readonly rect: Rect = new Rect(0.5 as Normalized, 0.5 as Normalized, 1, 1);
+  private _width: number;
+  private _height: number;
   public zoom: number = 1.0;
   public projectionMatrix: Matrix4 = new Matrix4();
   public viewMatrix: Matrix4 = new Matrix4();
   public viewProjectionMatrix: Matrix4 = new Matrix4();
   public invViewProjectionMatrix: Matrix4 = new Matrix4();
+  private baseWidth: UInt;
 
-  constructor(width: UInt, height: UInt) {
-    this.rect.width = width;
-    this.rect.height = height;
+  constructor(viewport: Viewport, width: UInt, height: UInt) {
+    this.viewport = viewport;
+    this.baseWidth = width;
+    this._width = width;
+    this._height = height;
     this.updateMatrices();
+  }
+  public get width() {
+    return this._width;
+  }
+  public get height() {
+    return this._height;
   }
 
   public setSize(width: UInt, height: UInt) {
-    this.rect.width = width;
-    this.rect.height = height;
+    this._width = width;
+    this._height = height;
+
+    // Update camera matrices
+    this.updateMatrices();
+  }
+
+  public setAspect(aspect: number) {
+    this._width = this.baseWidth;
+    this._height = this.baseWidth / aspect;
 
     // Update camera matrices
     this.updateMatrices();
   }
 
   public screenToWorld(screenX: number, screenY: number): Vector2 {
-    // Convert screen coords to NDC ( -1 to +1 )
-    const ndcX = 2 * (screenX / this.rect.width) - 1;
-    const ndcY = 1 - 2 * (screenY / this.rect.height);
+    // Convert screen position to NDC position ( range -1 to 1 )
+    const nx = (screenX / this.viewport.width) * 2 - 1;
+    const ny = 1 - (screenY / this.viewport.height) * 2;
 
-    // Transform by inverse matrix and return
-    const worldPosition = Matrix4.transform(new Vector4(ndcX, ndcY, 0, 1), this.invViewProjectionMatrix.data);
+    // convert NDC to viewport coords
+    const vx = (nx * (this._width / 2)) / this.zoom;
+    const vy = (ny * (this._height / 2)) / this.zoom;
 
-    const w = worldPosition.w;
-    return new Vector2(worldPosition.x / w, worldPosition.y / w);
+    // add camera position
+    const worldX = this.transform.position.x + vx;
+    const worldY = this.transform.position.y + vy;
+
+    return new Vector2(worldX, worldY);
   }
 
   public updateMatrices() {
     // Update ortho matrix
-    const width = (this.rect.width / this.zoom) * this.rect.x;
-    const height = (this.rect.height / this.zoom) * this.rect.y;
-    this.projectionMatrix.orthographic(-width, width, -height, height, -1, 1);
+    const halfWidth = this._width / this.zoom / 2;
+    const halfHeight = this._height / this.zoom / 2;
+    this.projectionMatrix.orthographic(-halfWidth, halfWidth, -halfHeight, halfHeight, -1, 1);
 
     // Apply Scale -> Rotate -> Translate
     this.viewMatrix.identity();
     this.viewMatrix.scale(this.transform.scale.x, this.transform.scale.y, this.transform.scale.z);
 
-    // ! todo: 이 함수는 matrix4에 구현할 것
+    // ~ 이 함수는 matrix4에 구현할 것
     //this.viewMatrix.fromQuaternion(this.transform.rotation);
 
     this.viewMatrix.translateXY(this.transform.position.x, this.transform.position.y);

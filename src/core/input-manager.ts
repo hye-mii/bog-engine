@@ -1,13 +1,11 @@
-import type { BogEngine } from "./bog-engine";
-
 export class InputManager {
   // Dependencies
-  private readonly engine: BogEngine;
   private readonly canvasElement: HTMLCanvasElement;
   private readonly viewportElement: HTMLDivElement;
 
   // Event states
   private activePointerId: number | null = null;
+  private onWindowResizeCallbaccs: (() => void)[] = [];
 
   // Canvas states
   public isCanvasHovered: boolean = true;
@@ -20,13 +18,14 @@ export class InputManager {
   public rawClientY: number = 0;
   public rawScrollDeltaY: number = 0;
 
+  public doubleClick: boolean = false;
+
   // Keyboard keys and states
   public isControlKeyDown: boolean = false;
   public isShiftKeyDown: boolean = false;
   public isAltKeyDown: boolean = false;
 
-  constructor(engine: BogEngine, canvasElement: HTMLCanvasElement, viewportElement: HTMLDivElement) {
-    this.engine = engine;
+  constructor(canvasElement: HTMLCanvasElement, viewportElement: HTMLDivElement) {
     this.canvasElement = canvasElement;
     this.viewportElement = viewportElement;
   }
@@ -43,6 +42,23 @@ export class InputManager {
 
     // Bind global event listeners
     this.bindGlobalListeners();
+  }
+
+  /**
+   * Registers a function to be called whenever the browser window is resized
+   */
+  public addResizeListener(callback: () => void): void {
+    this.onWindowResizeCallbaccs.push(callback);
+  }
+
+  /**
+   * Removes a previously registered resize listener
+   */
+  public removeResizeListener(callback: () => void): void {
+    const index = this.onWindowResizeCallbaccs.indexOf(callback);
+    if (index > -1) {
+      this.onWindowResizeCallbaccs.splice(index, 1);
+    }
   }
 
   /**
@@ -70,6 +86,9 @@ export class InputManager {
     viewportElement.addEventListener("pointermove", this.onViewportPointerMove);
     viewportElement.addEventListener("pointercancel", this.onViewportPointerUp);
     viewportElement.addEventListener("lostpointercapture", this.onViewportPointerUp);
+
+    // Mouse double click
+    viewportElement.addEventListener("dblclick", this.onViewportMouseDoubleClick);
 
     // Mouse scroll wheel
     viewportElement.addEventListener("wheel", this.onViewportWheel, { passive: false });
@@ -223,7 +242,7 @@ export class InputManager {
   };
 
   private onWindowResize = () => {
-    this.engine.updateViewport();
+    this.onWindowResizeCallbaccs.forEach((fn) => fn());
   };
 
   private onKeyDown = (e: KeyboardEvent) => {
@@ -248,5 +267,15 @@ export class InputManager {
 
   private onViewportContextMenu = (e: PointerEvent) => {
     e.preventDefault();
+  };
+
+  private onViewportMouseDoubleClick = (e: MouseEvent) => {
+    switch (e.button) {
+      case 0:
+        this.doubleClick = true;
+        break;
+      default:
+        break;
+    }
   };
 }

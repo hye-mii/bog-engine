@@ -1,4 +1,5 @@
 import type { Normalized } from "../types";
+import type { Vector2 } from "../utils/vector-2";
 
 export class Rect {
   public x: Normalized;
@@ -16,15 +17,12 @@ export class Rect {
   public get left() {
     return this.x;
   }
-
   public get top() {
     return this.y;
   }
-
   public get right() {
     return this.x + this.width;
   }
-
   public get bottom() {
     return this.y + this.height;
   }

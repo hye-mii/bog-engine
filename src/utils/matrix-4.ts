@@ -1,3 +1,4 @@
+import type { Quaternion } from "./quaternion";
 import type { Vector4 } from "./vector-4";
 
 export class Matrix4 {
@@ -306,7 +307,8 @@ export class Matrix4 {
   }
 
   public identity() {
-    Matrix4.identity(this.data);
+    this.data.fill(0);
+    this.data[0] = this.data[5] = this.data[10] = this.data[15] = 1;
   }
 
   public orthographic(left: number, right: number, bottom: number, top: number, near: number, far: number) {
@@ -314,20 +316,66 @@ export class Matrix4 {
   }
 
   public scale(sx: number, sy: number, sz: number) {
-    // Scale X, Y, and Z basis vectors
     const d = this.data;
     d[0] *= sx;
     d[1] *= sx;
     d[2] *= sx;
     d[3] *= sx;
+
     d[4] *= sy;
     d[5] *= sy;
     d[6] *= sy;
     d[7] *= sy;
+
     d[8] *= sz;
     d[9] *= sz;
     d[10] *= sz;
     d[11] *= sz;
+  }
+
+  public scaleXY(sx: number, sy: number) {
+    const d = this.data;
+    d[0] *= sx;
+    d[1] *= sx;
+    d[2] *= sx;
+    d[3] *= sx;
+
+    d[4] *= sy;
+    d[5] *= sy;
+    d[6] *= sy;
+    d[7] *= sy;
+  }
+
+  public scaleYZ(sy: number, sz: number) {
+    const d = this.data;
+    d[4] *= sy;
+    d[5] *= sy;
+    d[6] *= sy;
+    d[7] *= sy;
+
+    d[8] *= sz;
+    d[9] *= sz;
+    d[10] *= sz;
+    d[11] *= sz;
+  }
+
+  public scaleZX(sz: number, sx: number) {
+    const d = this.data;
+    d[0] *= sx;
+    d[1] *= sx;
+    d[2] *= sx;
+    d[3] *= sx;
+
+    d[8] *= sz;
+    d[9] *= sz;
+    d[10] *= sz;
+    d[11] *= sz;
+  }
+
+  public rotate(rx: number, ry: number, rz: number) {
+    this.rotateZ(rz);
+    this.rotateY(ry);
+    this.rotateX(rx);
   }
 
   public rotateX(rad: number) {
@@ -403,12 +451,6 @@ export class Matrix4 {
     d[5] = y1 * cos - x1 * sin;
     d[6] = y2 * cos - x2 * sin;
     d[7] = y3 * cos - x3 * sin;
-  }
-
-  public rotate(rx: number, ry: number, rz: number) {
-    this.rotateZ(rz);
-    this.rotateY(ry);
-    this.rotateX(rx);
   }
 
   public translate(tx: number, ty: number, tz: number) {
@@ -552,5 +594,41 @@ export class Matrix4 {
     d[15] = (a20 * b03 - a21 * b01 + a22 * b00) * det;
 
     return this;
+  }
+
+  public fromQuaternion(q: Quaternion) {
+    const { x, y, z, w } = q;
+    const d = this.data;
+
+    const xx = x * x;
+    const yy = y * y;
+    const zz = z * z;
+
+    const xy = x * y;
+    const xz = x * z;
+    const yz = y * z;
+    const wx = w * x;
+    const wy = w * y;
+    const wz = w * z;
+
+    d[0] = 1 - 2 * (yy + zz);
+    d[1] = 2 * (xy + wz);
+    d[2] = 2 * (xz - wy);
+    d[3] = 0;
+
+    d[4] = 2 * (xy - wz);
+    d[5] = 1 - 2 * (xx + zz);
+    d[6] = 2 * (yz + wx);
+    d[7] = 0;
+
+    d[8] = 2 * (xz + wy);
+    d[9] = 2 * (yz - wx);
+    d[10] = 1 - 2 * (xx + yy);
+    d[11] = 0;
+
+    d[12] = 0;
+    d[13] = 0;
+    d[14] = 0;
+    d[15] = 1;
   }
 }

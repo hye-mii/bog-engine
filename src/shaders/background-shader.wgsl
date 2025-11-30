@@ -38,7 +38,7 @@ fn fs_main(in : VertexOut) -> @location(0) vec4f {
     //Perspective divide
     var worldPos : vec2f = worldPos4f.xy / worldPos4f.w;
 
-    let lineWorldThickness = u.lineThickness * global.worldUnitPerPixel;
+    let lineWorldThickness = u.lineThickness / global.worldUnitPerPixel;
     var gridSize = u.gridSize;
 
     let wx = worldPos.x - gridSize.x * floor(worldPos.x / gridSize.x);
