@@ -1,29 +1,29 @@
-import type { Normalized } from "../types";
-import type { Vector2 } from "../utils/vector-2";
+import { clamp } from "../utils/math";
 
 export class Rect {
-  public x: Normalized;
-  public y: Normalized;
+  private _x: number;
+  private _y: number;
   public width: number;
   public height: number;
 
-  constructor(x: Normalized, y: Normalized, width: number, height: number) {
-    this.x = x;
-    this.y = y;
+  constructor(x: number, y: number, width: number, height: number) {
+    this._x = clamp(x, 0, 1);
+    this._y = clamp(y, 0, 1);
     this.width = width;
     this.height = height;
   }
 
-  public get left() {
-    return this.x;
+  public get x() {
+    return this._x;
   }
-  public get top() {
-    return this.y;
+  public get y() {
+    return this._y;
   }
-  public get right() {
-    return this.x + this.width;
+
+  public set x(v) {
+    this._x = v;
   }
-  public get bottom() {
-    return this.y + this.height;
+  public set y(v) {
+    this._y = v;
   }
 }

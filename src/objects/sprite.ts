@@ -29,7 +29,7 @@ export class Sprite {
   constructor(width: UInt, height: UInt, x: number, y: number) {
     this.id = generateHashedId(6) as SpriteId;
     this.name = `Sprite_${this.id}`;
-    this.rect = new Rect(0 as Normalized, 0 as Normalized, width, height);
+    this.rect = new Rect(0.5, 0.5, width, height);
     this.flattenedData = new Uint8Array(width * height * 4) as PixelDataRGBA;
     this.transform.position.x = x;
     this.transform.position.y = y;
@@ -102,8 +102,8 @@ export class Sprite {
     const rect = this.rect;
 
     // Pivot offset x, and y are normalised ( 0 to 1 )
-    const pivotOffsetX = -rect.x * rect.width;
-    const pivotOffsetY = -rect.y * rect.height;
+    const pivotOffsetX = rect.x;
+    const pivotOffsetY = rect.y;
 
     // World screen scaling
     const scaleX = rect.width * transform.scale.x;
