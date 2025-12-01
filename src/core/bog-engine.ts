@@ -36,9 +36,6 @@ export class BogEngine {
   private isPanning: boolean = false;
   private panMousePosition: Vector2 = new Vector2(0, 0);
 
-  // ~ temp
-  private isSpriteFocused: boolean = false;
-
   constructor(settings: SettingsType, viewportElement: HTMLDivElement) {
     // ------ Store initial configuration ------
     this.settings = settings;
@@ -69,7 +66,6 @@ export class BogEngine {
 
     // Add a default scene
     this.scene.addSprite(16 as UInt, 16 as UInt, 0, 0);
-    this.scene.addSprite(16 as UInt, 16 as UInt, 0, 1);
 
     // Start main loop
     requestAnimationFrame(this.loop);
@@ -175,8 +171,8 @@ export class BogEngine {
         this.panMousePosition.y = this.mousePosition.y;
       } else {
         // Calculate mouse delta
-        const deltaX = this.mousePosition.x - this.panMousePosition.x;
-        const deltaY = this.mousePosition.y - this.panMousePosition.y;
+        const deltaX = this.panMousePosition.x - this.mousePosition.x;
+        const deltaY = this.panMousePosition.y - this.mousePosition.y;
 
         // Apply pan
         controller.moveCamera(deltaX, -deltaY);
@@ -191,17 +187,7 @@ export class BogEngine {
 
     // Double click
     if (doubleClick) {
-      const worldPos = this.viewport.camera.screenToWorld(this.mousePosition.x, this.mousePosition.y);
-      console.log(`x:${worldPos.x} y:${worldPos.y}`);
-
-      // const spriteId = this.scene.addSprite(16 as UInt, 16 as UInt, worldPos.x / 16, worldPos.y / 16);
-      // const newSprite = this.scene.sprites.get(spriteId)!;
-
-      // const sprite = this.scene.getSpriteAtWorld(this.viewport.camera.screenToWorld(this.mousePosition.x, this.mousePosition.y));
-      // if (sprite) {
-      //   this.isSpriteFocused = true;
-      //   sprite.addLayer("normal");
-      // }
+      this.scene.onDoubleClick(this.mousePosition, this.viewport.camera, this.viewport.cameraController);
     }
   }
 }

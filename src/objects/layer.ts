@@ -8,6 +8,7 @@ export class Layer {
   constructor(width: UInt, height: UInt, blendMode: BlendMode = "normal") {
     this.data = new Uint8ClampedArray(width * height * 4);
     this.blendMode = blendMode;
+    this.fill({ r: 255, g: 255, b: 255, a: 255 } as Color);
   }
 
   public fill(color: Color) {

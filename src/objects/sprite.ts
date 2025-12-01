@@ -102,22 +102,22 @@ export class Sprite {
     const rect = this.rect;
 
     // Pivot offset x, and y are normalised ( 0 to 1 )
-    const pivotOffsetX = rect.x * rect.width;
-    const pivotOffsetY = rect.y * rect.height;
+    const pivotOffsetX = -rect.x * rect.width;
+    const pivotOffsetY = -rect.y * rect.height;
 
     // World screen scaling
     const scaleX = rect.width * transform.scale.x;
     const scaleY = rect.height * transform.scale.y;
 
-    // Apply Pivot -> Scale -> Rotate -> Translate
+    // Apply Translate -> Rotate -> Scale -> Pivot
     modelMatrix.identity();
-    modelMatrix.translateXY(-pivotOffsetX, -pivotOffsetY);
-    modelMatrix.scaleXY(scaleX, scaleY);
+    modelMatrix.translateXY(transform.position.x + transform.pivot.x, transform.position.y + transform.pivot.y);
 
     // ~ quaternion에서 Z축 rad 값 가져오는 함수 만들어야 함
     // modelMatrix.rotateZ(...);
 
-    modelMatrix.translate(transform.position.x + transform.pivot.x, transform.position.y + transform.pivot.y, 0);
+    modelMatrix.scaleXY(scaleX, scaleY);
+    modelMatrix.translateXY(-pivotOffsetX, -pivotOffsetY);
   }
 
   public addLayer(blendMode: BlendMode, setActive: boolean = true) {

@@ -71,12 +71,12 @@ export class Camera {
 
     // Apply Scale -> Rotate -> Translate
     this.viewMatrix.identity();
-    this.viewMatrix.scale(this.transform.scale.x, this.transform.scale.y, this.transform.scale.z);
+    this.viewMatrix.translateXY(-this.transform.position.x, -this.transform.position.y);
 
     // ~ 이 함수는 matrix4에 구현할 것
     //this.viewMatrix.fromQuaternion(this.transform.rotation);
 
-    this.viewMatrix.translateXY(this.transform.position.x, this.transform.position.y);
+    this.viewMatrix.scale(this.transform.scale.x, this.transform.scale.y, this.transform.scale.z);
 
     // View projection = projection * view
     this.viewProjectionMatrix.multiply2(this.projectionMatrix.data, this.viewMatrix.data);

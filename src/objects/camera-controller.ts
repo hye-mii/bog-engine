@@ -40,8 +40,8 @@ export class CameraController {
     this.camera.zoom = clamp(this.camera.zoom * zoomFactor, this.MIN_ZOOM, this.MAX_ZOOM);
 
     const newWorldPosition = this.camera.screenToWorld(mousePosition.x, mousePosition.y);
-    const dx = newWorldPosition.x - oldWorldPosition.x;
-    const dy = newWorldPosition.y - oldWorldPosition.y;
+    const dx = oldWorldPosition.x - newWorldPosition.x;
+    const dy = oldWorldPosition.y - newWorldPosition.y;
     this.camera.transform.position.x += dx;
     this.camera.transform.position.y += dy;
 

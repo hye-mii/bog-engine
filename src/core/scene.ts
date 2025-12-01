@@ -1,13 +1,22 @@
 import type { SpriteId, UInt } from "../types";
 import { Sprite } from "../objects/sprite";
 import { Vector2 } from "../utils/vector-2";
+import type { Camera } from "../objects/camera";
+import type { CameraController } from "../objects/camera-controller";
+
+enum EditorMode {
+  Object = 0,
+  Edit = 1,
+}
 
 export class Scene {
-  public sprites = new Map<string, Sprite>();
+  private mode: EditorMode = EditorMode.Object;
 
   // Event listeners
   private onSpriteAddedCallbacc: ((sprite: Sprite) => void)[] = [];
   private onSpriteRemovedCallbacc: ((id: SpriteId) => void)[] = [];
+
+  public sprites = new Map<string, Sprite>();
 
   constructor() {}
 
@@ -17,6 +26,19 @@ export class Scene {
 
   public addSpriteRemovedListener(callback: (id: SpriteId) => void) {
     this.onSpriteRemovedCallbacc.push(callback);
+  }
+
+  public onDoubleClick(mousePosition: Vector2, camera: Camera, controller: CameraController) {
+    if (this.mode === EditorMode.Edit) return;
+
+    const worldPosition = camera.screenToWorld(mousePosition.x, mousePosition.y);
+    const sprite = this.getSpriteAtWorld(worldPosition);
+    if (sprite) {
+      this.mode = EditorMode.Edit;
+      sprite.addLayer("normal");
+
+      // Move the camera
+    }
   }
 
   public addSprite(width: UInt, height: UInt, x: number, y: number): SpriteId {
