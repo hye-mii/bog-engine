@@ -1,5 +1,5 @@
-import type { BlendMode, Color, UInt } from "../types";
-import type { Sprite } from "./sprite";
+import type { BlendMode, UInt } from "../types";
+import type { Color } from "./color";
 
 export class Layer {
   public data: Uint8ClampedArray;

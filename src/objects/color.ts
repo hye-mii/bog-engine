@@ -2,10 +2,17 @@ import type { UInt8 } from "../types";
 import { clamp } from "../utils/math";
 
 export class Color {
-  private _r: UInt8 = 0 as UInt8;
-  private _g: UInt8 = 0 as UInt8;
-  private _b: UInt8 = 0 as UInt8;
-  private _a: UInt8 = 255 as UInt8;
+  private _r: UInt8;
+  private _g: UInt8;
+  private _b: UInt8;
+  private _a: UInt8;
+
+  constructor(r: number, g: number, b: number, a: number = 255) {
+    this._r = clamp(r, 0, 255) as UInt8;
+    this._g = clamp(g, 0, 255) as UInt8;
+    this._b = clamp(b, 0, 255) as UInt8;
+    this._a = clamp(a, 0, 255) as UInt8;
+  }
 
   public get r(): UInt8 {
     return this._r;

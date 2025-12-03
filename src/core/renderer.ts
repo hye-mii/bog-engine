@@ -167,14 +167,17 @@ export class WebGPURenderer {
         throw Error(`No GPU sprite found for sprite id:${sprite.id}`);
       }
 
-      // Update GPU sprite uniform if dirty
-      if (sprite.isDirty) {
-        gpuSprite.updateUniform(this.device, sprite.modelMatrix.data);
-        sprite.isDirty = false;
+      // Update sprite flattend data
+      if (sprite.isFlattendedDataDirty) {
+        sprite.updateFlattenedData();
+        this.uploadSpriteTexture(gpuSprite.texture, sprite.flattenedData, sprite.width, sprite.height);
       }
 
-      // Upload sprite texture to GPU
-      this.uploadSpriteTexture(gpuSprite.texture, sprite.flattenedData, sprite.rect.width, sprite.rect.height);
+      // Update GPU sprite uniform if dirty
+      if (sprite.isMatrixDirty) {
+        sprite.updateModelMatrix();
+        gpuSprite.updateUniform(this.device, sprite.modelMatrix.data);
+      }
 
       pass.setBindGroup(1, gpuSprite.bindGroup);
       pass.draw(6);

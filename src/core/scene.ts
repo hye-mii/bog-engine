@@ -1,4 +1,4 @@
-import type { SpriteId, UInt } from "../types";
+import type { SpriteId, UInt, WeakVector2 } from "../types";
 import { Sprite } from "../objects/sprite";
 import { Vector2 } from "../utils/vector-2";
 import type { Camera } from "../objects/camera";
@@ -38,8 +38,10 @@ export class Scene {
       sprite.addLayer("normal");
 
       // Move the camera
-      camera.setPosition(sprite.transform.position.x, sprite.transform.position.y);
-      camera.setZoom((camera.height / sprite.rect.height) * 0.8);
+      // camera.setPosition(sprite.transform.position.x, sprite.transform.position.y);
+      // camera.setZoom((camera.height / sprite.rect.height) * 0.8);
+      controller.moveTo(sprite.transform.position.x, sprite.transform.position.y);
+      controller.zoomTo((camera.height / sprite.rect.height) * 0.8);
     }
   }
 
@@ -67,7 +69,7 @@ export class Scene {
     return true;
   }
 
-  public getSpriteAtWorld(position: Vector2): Sprite | undefined {
+  public getSpriteAtWorld(position: Vector2 | WeakVector2): Sprite | undefined {
     const sortedSprites = [...this.sprites.values()].sort((a, b) => b.zIndex - a.zIndex);
     for (const sprite of sortedSprites) {
       if (sprite.contains(position)) return sprite;

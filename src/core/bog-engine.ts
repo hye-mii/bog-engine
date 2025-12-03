@@ -108,6 +108,8 @@ export class BogEngine {
   private loop = () => {
     const dt = 0.016;
 
+    this.viewport.cameraController.update(dt);
+
     //
     // this.viewport.cameraController.update(dt);
 
@@ -168,6 +170,11 @@ export class BogEngine {
     }
     if (rawScrollDeltaY !== 0) {
       controller.zoom(mousePosition, -rawScrollDeltaY);
+    }
+
+    // Handle double click event
+    if (doubleClick) {
+      this.scene.onDoubleClick(mousePosition, camera, controller);
     }
 
     // ! testing
