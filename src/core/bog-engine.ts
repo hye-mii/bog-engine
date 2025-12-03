@@ -8,6 +8,8 @@ import { Scene } from "./scene";
 import { Sprite } from "../objects/sprite";
 import { Vector2 } from "../utils/vector-2";
 
+import { CameraTests } from "../../test/camera.test";
+
 // Custom comments expressions used in the project
 // ! notice
 // ? question
@@ -33,8 +35,7 @@ export class BogEngine {
   private brushSize: number = 1;
   private prevMousePosition: Vector2 = new Vector2(0, 0);
   private mousePosition: Vector2 = new Vector2(0, 0);
-  private isPanning: boolean = false;
-  private panMousePosition: Vector2 = new Vector2(0, 0);
+  private mouseDelta: Vector2 = new Vector2(0, 0);
 
   constructor(settings: SettingsType, viewportElement: HTMLDivElement) {
     // ------ Store initial configuration ------
@@ -50,7 +51,7 @@ export class BogEngine {
     this.renderer = new WebGPURenderer();
     this.input = new InputManager(this.canvasElement, this.viewportElement);
     this.ui = new UIManager();
-    this.viewport = new Viewport(this.canvasElement.width, this.canvasElement.height, settings.camera.size);
+    this.viewport = new Viewport(this.canvasElement.width, this.canvasElement.height, settings.camera);
     this.scene = new Scene();
   }
 
@@ -108,7 +109,7 @@ export class BogEngine {
     const dt = 0.016;
 
     //
-    this.viewport.cameraController.update(dt);
+    // this.viewport.cameraController.update(dt);
 
     // Process input this frame
     this.processInput();
@@ -123,71 +124,62 @@ export class BogEngine {
   };
 
   private processInput() {
-    // Retreive raw inputs
+    // --------- Retreive Raw Inputs ---------
+
     const rawClientX = this.input.rawClientX;
     const rawClientY = this.input.rawClientY;
     const rawScrollDeltaY = this.input.rawScrollDeltaY;
     this.input.rawScrollDeltaY = 0;
-
-    const rect = this.canvasElement.getBoundingClientRect();
-    const canvasRectWidth = rect.width;
-    const canvasRectHeight = rect.height;
-    const canvasRectLeft = rect.left;
-    const canvasRectTop = rect.top;
-
     const isAuxiliaryButtonDown = this.input.isAuxiliaryButtonDown;
     const isControlKeyDown = this.input.isControlKeyDown;
     const isShiftKeyDown = this.input.isShiftKeyDown;
     const isAltKeyDown = this.input.isAltKeyDown;
-
     const doubleClick = this.input.doubleClick;
     this.input.doubleClick = false;
 
-    const pixelX = rawClientX - canvasRectLeft;
-    const pixelY = rawClientY - canvasRectTop;
+    // --------- Calculate Input ---------
+    const prevMousePosition = this.prevMousePosition;
+    const mousePosition = this.mousePosition;
+    const mouseDelta = this.mouseDelta;
 
-    const scaleFactorX = this.canvasElement.width / canvasRectWidth;
-    const scaleFactorY = this.canvasElement.height / canvasRectHeight;
+    // Update previous mouse screen position
+    prevMousePosition.x = mousePosition.x;
+    prevMousePosition.y = mousePosition.y;
 
-    // Update mouse coordinates
-    this.prevMousePosition.x = this.mousePosition.x;
-    this.prevMousePosition.y = this.mousePosition.y;
-    this.mousePosition.x = Math.floor(pixelX * scaleFactorX);
-    this.mousePosition.y = Math.floor(pixelY * scaleFactorY);
+    // Calculate new mouse screen position
+    const rect = this.canvasElement.getBoundingClientRect();
+    mousePosition.x = Math.floor(rawClientX - rect.left); // Offset by canvas' position
+    mousePosition.y = Math.floor(rawClientY - rect.top);
 
-    // Handle camera controls
+    // Calculate and update mouse delta (difference btw previous and current mouse position)
+    mouseDelta.x = prevMousePosition.x - mousePosition.x;
+    mouseDelta.y = prevMousePosition.y - mousePosition.y;
+
+    // ! testing
+    // console.log(`Raw Input: x:${mouseDelta.x} y:${mouseDelta.y} \n Mouse Coords: x:${mousePosition.x} y:${mousePosition.y}`);
+
+    // --------- Process Input ---------
+
+    // Handle camera pan and zoom
+    const camera = this.viewport.camera;
     const controller = this.viewport.cameraController;
-
-    // Zoom
+    if (isAuxiliaryButtonDown && (mouseDelta.x !== 0 || mouseDelta.y !== 0)) {
+      controller.pan(mouseDelta.x, mouseDelta.y);
+    }
     if (rawScrollDeltaY !== 0) {
-      controller.zoomCamera(this.mousePosition, -rawScrollDeltaY);
+      controller.zoom(mousePosition, -rawScrollDeltaY);
     }
 
-    // Pan
-    if (isAuxiliaryButtonDown && (this.mousePosition.x !== this.prevMousePosition.x || this.mousePosition.y !== this.prevMousePosition.y)) {
-      if (!this.isPanning) {
-        this.isPanning = true;
-        this.panMousePosition.x = this.mousePosition.x;
-        this.panMousePosition.y = this.mousePosition.y;
-      } else {
-        // Calculate mouse delta
-        const deltaX = this.panMousePosition.x - this.mousePosition.x;
-        const deltaY = this.panMousePosition.y - this.mousePosition.y;
-
-        // Apply pan
-        controller.moveCamera(deltaX, -deltaY);
-
-        // Update anchor for next frame
-        this.panMousePosition.x = this.mousePosition.x;
-        this.panMousePosition.y = this.mousePosition.y;
-      }
-    } else {
-      this.isPanning = false;
-    }
-
-    // Double click
-    if (doubleClick) {
-      this.scene.onDoubleClick(this.mousePosition, this.viewport.camera, this.viewport.cameraController);
-    }
+    // ! testing
+    // CameraTests.screenToWorld(
+    //   camera,
+    //   this.viewport.width,
+    //   this.viewport.height,
+    //   camera.width,
+    //   camera.height,
+    //   camera.position.x,
+    //   camera.position.y,
+    //   camera.zoom
+    // );
   }
 }

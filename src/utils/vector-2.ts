@@ -17,4 +17,8 @@ export class Vector2 {
     this.y += (target.y - this.y) * t;
     return this;
   }
+
+  public clone(): Vector2 {
+    return new Vector2(this.x, this.y);
+  }
 }

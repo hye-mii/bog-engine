@@ -1,72 +1,129 @@
-import type { UInt } from "../types";
+import type { CameraConfig, UInt, WeakVector2 } from "../types";
 import { Vector2 } from "../utils/vector-2";
 import { Matrix4 } from "../utils/matrix-4";
 import { Transform } from "./transform";
 import { Viewport } from "../core/viewport";
 
 export class Camera {
+  // Dependencies
   private readonly viewport: Viewport;
 
-  public readonly transform: Transform = new Transform();
-  private _width: number;
-  private _height: number;
-  public zoom: number = 1.0;
-  public projectionMatrix: Matrix4 = new Matrix4();
-  public viewMatrix: Matrix4 = new Matrix4();
-  public viewProjectionMatrix: Matrix4 = new Matrix4();
-  public invViewProjectionMatrix: Matrix4 = new Matrix4();
-  private baseWidth: UInt;
+  // State
+  private readonly transform: Transform = new Transform();
+  private aspectRatio: number;
+  private storedWidth: number;
+  private zoomLevel: number;
 
-  constructor(viewport: Viewport, width: UInt, height: UInt) {
+  private _worldPerPixelX: number;
+  private _worldPerPixelY: number;
+
+  public isMatrixDirty: boolean;
+
+  // Camera matrices
+  public readonly projectionMatrix: Matrix4 = new Matrix4();
+  public readonly viewMatrix: Matrix4 = new Matrix4();
+  public readonly viewProjectionMatrix: Matrix4 = new Matrix4();
+  public readonly invViewProjectionMatrix: Matrix4 = new Matrix4();
+
+  constructor(viewport: Viewport, cameraConfig: CameraConfig) {
     this.viewport = viewport;
-    this.baseWidth = width;
-    this._width = width;
-    this._height = height;
-    this.updateMatrices();
+
+    // Apply settings
+    this.transform.position.x = cameraConfig.position.x;
+    this.transform.position.y = cameraConfig.position.y;
+    this.aspectRatio = cameraConfig.width / cameraConfig.height;
+    this.storedWidth = cameraConfig.width;
+    this.zoomLevel = cameraConfig.zoom;
+
+    // Update world per pixel values
+    this._worldPerPixelX = this.storedWidth / viewport.width / this.zoomLevel;
+    this._worldPerPixelY = this.height / viewport.height / this.zoomLevel;
+
+    // Mark camera matrices dirty
+    this.isMatrixDirty = true;
   }
   public get width() {
-    return this._width;
+    return this.storedWidth;
   }
   public get height() {
-    return this._height;
+    return this.storedWidth / this.aspectRatio;
+  }
+  public get position() {
+    return this.transform.position;
+  }
+  public get zoom() {
+    return this.zoomLevel;
+  }
+  public get worldPerPixelX() {
+    return this._worldPerPixelX;
+  }
+  public get worldPerPixelY() {
+    return this._worldPerPixelY;
   }
 
-  public setSize(width: UInt, height: UInt) {
-    this._width = width;
-    this._height = height;
+  /**
+   * Set new zoom value
+   */
+  public setZoom(value: number): void {
+    if (value <= 0) {
+      console.error("Camera zoom must be positive number.");
+      return;
+    }
+    this.zoomLevel = value;
 
-    // Update camera matrices
-    this.updateMatrices();
+    // Update world per pixel values
+    this._worldPerPixelX = this.width / this.viewport.width / this.zoom;
+    this._worldPerPixelY = this.height / this.viewport.height / this.zoom;
+
+    // Set matrices dirty
+    this.isMatrixDirty = true;
   }
 
-  public setAspect(aspect: number) {
-    this._width = this.baseWidth;
-    this._height = this.baseWidth / aspect;
+  /**
+   * Set new aspect ratio of the camera. Does not change it's actual width.
+   */
+  public setAspect(width: number, height: number): void {
+    this.aspectRatio = width / height;
 
-    // Update camera matrices
-    this.updateMatrices();
+    // Update world per pixel values
+    this._worldPerPixelX = this.width / this.viewport.width / this.zoom;
+    this._worldPerPixelY = this.height / this.viewport.height / this.zoom;
+
+    // Set matrices dirty
+    this.isMatrixDirty = true;
   }
 
-  public screenToWorld(screenX: number, screenY: number): Vector2 {
-    // Convert screen position to NDC position ( range -1 to 1 )
-    const nx = (screenX / this.viewport.width) * 2 - 1;
-    const ny = 1 - (screenY / this.viewport.height) * 2;
-
-    // convert NDC to viewport coords
-    const vx = (nx * (this._width / 2)) / this.zoom;
-    const vy = (ny * (this._height / 2)) / this.zoom;
-
-    // add camera position
-    const worldX = this.transform.position.x + vx;
-    const worldY = this.transform.position.y + vy;
-
-    return new Vector2(worldX, worldY);
+  /**
+   *
+   */
+  public setPosition(newX: number, newY: number): void {
+    this.transform.position.x = newX;
+    this.transform.position.y = newY;
+    this.isMatrixDirty = true;
   }
 
-  public updateMatrices() {
+  /**
+   * Calculate screen to world position
+   */
+  public screenToWorld(screenX: number, screenY: number): WeakVector2 {
+    // Calculate world position relative to camera
+    const vX = this.worldPerPixelX * (screenX - this.viewport.width / 2);
+    const vY = this.worldPerPixelY * (screenY - this.viewport.height / 2);
+
+    // Offset by camera to get the final world position
+    const worldX = this.position.x + vX;
+    const worldY = this.position.y - vY;
+
+    return { x: worldX, y: worldY };
+  }
+
+  /**
+   * Update camera's projection, view, view projection, and inverse view projection matrices.
+   */
+  public updateMatrices(): void {
     // Update ortho matrix
-    const halfWidth = this._width / this.zoom / 2;
-    const halfHeight = this._height / this.zoom / 2;
+    const halfWidth = this.width / this.zoom / 2;
+    const halfHeight = this.height / this.zoom / 2;
     this.projectionMatrix.orthographic(-halfWidth, halfWidth, -halfHeight, halfHeight, -1, 1);
 
     // Apply Scale -> Rotate -> Translate
@@ -83,5 +140,8 @@ export class Camera {
 
     // Inverse view projection
     this.invViewProjectionMatrix.invert(this.viewProjectionMatrix.data);
+
+    // Matrices have been updated
+    this.isMatrixDirty = false;
   }
 }

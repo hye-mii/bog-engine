@@ -1,4 +1,4 @@
-import type { UInt } from "../types";
+import type { CameraConfig, UInt } from "../types";
 import { Camera } from "../objects/camera";
 import { CameraController } from "../objects/camera-controller";
 
@@ -9,14 +9,15 @@ export class Viewport {
   public readonly camera: Camera;
   public readonly cameraController: CameraController;
 
-  constructor(width: number, height: number, cameraSize: number) {
+  constructor(width: number, height: number, cameraConfig: CameraConfig) {
     this._width = Math.max(1, width) as UInt;
     this._height = Math.max(1, height) as UInt;
-    this.camera = new Camera(this, cameraSize as UInt, cameraSize as UInt);
-    this.cameraController = new CameraController(this, this.camera);
 
-    // Update camera's aspect ratio
-    this.camera.setAspect(this._width / this._height);
+    this.camera = new Camera(this, cameraConfig);
+    this.cameraController = new CameraController(this, this.camera, cameraConfig);
+
+    // Set camera's aspect ratio
+    this.camera.setAspect(this._width, this._height);
   }
   public get width(): UInt {
     return this._width;
@@ -33,6 +34,6 @@ export class Viewport {
     this._height = Math.max(1, height) as UInt;
 
     // Set camera's new aspect ratio
-    this.camera.setAspect(this._width / this._height);
+    this.camera.setAspect(this._width, this._height);
   }
 }

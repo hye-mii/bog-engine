@@ -38,6 +38,8 @@ export class Scene {
       sprite.addLayer("normal");
 
       // Move the camera
+      camera.setPosition(sprite.transform.position.x, sprite.transform.position.y);
+      camera.setZoom((camera.height / sprite.rect.height) * 0.8);
     }
   }
 

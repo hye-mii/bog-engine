@@ -1,51 +1,65 @@
 import { clamp, lerp } from "../utils/math";
 import { Camera } from "./camera";
 import { Vector2 } from "../utils/vector-2";
-import { BogEngine } from "../core/bog-engine";
-import { Vector3 } from "../utils/vector-3";
 import type { Viewport } from "../core/viewport";
+import type { CameraConfig } from "../types";
 
 export class CameraController {
   private readonly viewport: Viewport;
   private readonly camera: Camera;
 
   // Defaults
-  // private readonly PAN_SPEED = 0.009;
-  private readonly ZOOM_SPEED = 1.0015;
-  private readonly MIN_ZOOM = 0.2; // // 0.2
-  private readonly MAX_ZOOM = 12.0; // // 12.0
+  private readonly ZOOM_SPEED;
+  private readonly MIN_ZOOM;
+  private readonly MAX_ZOOM;
 
-  constructor(viewport: Viewport, camera: Camera) {
+  // Camera Pan Variables
+  private isPanning = false;
+  private panStartPosition = new Vector2(0, 0);
+  private cameraTargetLocation = new Vector2(0, 0);
+
+  private mouseStartPosition = new Vector2(0, 0);
+  private cameraStart = new Vector2(0, 0);
+
+  //
+  //
+  private worldStart = { x: 0, y: 0 };
+
+  constructor(viewport: Viewport, camera: Camera, cameraConfig: CameraConfig) {
     this.viewport = viewport;
     this.camera = camera;
+
+    this.ZOOM_SPEED = cameraConfig.zoomSpeed;
+    this.MIN_ZOOM = cameraConfig.minZoom;
+    this.MAX_ZOOM = cameraConfig.maxZoom;
   }
 
-  public update(dt: number) {}
+  public pan(deltaX: number, deltaY: number) {
+    const camera = this.camera;
+    const oldPosition = camera.position;
 
-  public moveCamera(deltaX: number, deltaY: number) {
-    const worldPerPixelX = this.camera.width / this.viewport.width / this.camera.zoom;
-    const worldPerPixelY = this.camera.height / this.viewport.height / this.camera.zoom;
-
-    this.camera.transform.position.x += deltaX * worldPerPixelX;
-    this.camera.transform.position.y += deltaY * worldPerPixelY;
-
-    this.camera.updateMatrices();
+    // Calculate new camera position
+    const newX = oldPosition.x + deltaX * camera.worldPerPixelX;
+    const newY = oldPosition.y - deltaY * camera.worldPerPixelY;
+    camera.setPosition(newX, newY);
   }
 
-  public zoomCamera(mousePosition: Vector2, zoomDelta: number) {
-    const oldWorldPosition = this.camera.screenToWorld(mousePosition.x, mousePosition.y);
+  public zoom(mousePosition: Vector2, zoomDelta: number) {
+    const camera = this.camera;
+
+    // Calculate camera's world position before applying zoom
+    const oldCameraPosition = this.camera.screenToWorld(mousePosition.x, mousePosition.y);
 
     // Apply zoom
-    const zoomFactor = Math.pow(this.ZOOM_SPEED, zoomDelta);
-    this.camera.zoom = clamp(this.camera.zoom * zoomFactor, this.MIN_ZOOM, this.MAX_ZOOM);
+    const newZoom = clamp(camera.zoom * Math.pow(this.ZOOM_SPEED, zoomDelta), this.MIN_ZOOM, this.MAX_ZOOM);
+    camera.setZoom(newZoom);
 
-    const newWorldPosition = this.camera.screenToWorld(mousePosition.x, mousePosition.y);
-    const dx = oldWorldPosition.x - newWorldPosition.x;
-    const dy = oldWorldPosition.y - newWorldPosition.y;
-    this.camera.transform.position.x += dx;
-    this.camera.transform.position.y += dy;
+    // Calculate camera's world position after zoom
+    const newCameraPosition = this.camera.screenToWorld(mousePosition.x, mousePosition.y);
 
-    // Recalculate matrices
-    this.camera.updateMatrices();
+    // Offset camera so mouse cursor stays on the world grid
+    const dx = oldCameraPosition.x - newCameraPosition.x;
+    const dy = oldCameraPosition.y - newCameraPosition.y;
+    camera.setPosition(camera.position.x + dx, camera.position.y + dy);
   }
 }

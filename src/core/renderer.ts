@@ -211,6 +211,11 @@ export class WebGPURenderer {
   private uploadGlobalBuffer(viewport: Viewport) {
     const camera = viewport.camera;
 
+    // Handle camera's matrix recalculation
+    if (camera.isMatrixDirty) {
+      camera.updateMatrices();
+    }
+
     const cameraBufferSize = 144;
     const globalData = new Float32Array(cameraBufferSize / 4);
 
