@@ -21,7 +21,19 @@ export class Sprite {
   // Transform Components
   public readonly modelMatrix = new Matrix4();
   private readonly rect: Rect;
+  public get width(): number {
+    return this.rect.width;
+  }
+  public get height(): number {
+    return this.rect.height;
+  }
   private readonly transform: Transform = new Transform();
+  public get x():number {
+    return this.transform.position.x;
+  }
+  public get y():number {
+    return this.transform.position.y;
+  }
 
   // Sprite Data
   public readonly flattenedData: PixelDataRGBA;
@@ -31,7 +43,13 @@ export class Sprite {
 
   // Dirty flags
   private _isMatrixDirty: boolean;
+  public get isMatrixDirty(): boolean {
+    return this._isMatrixDirty;
+  }
   private _isFlattendedDataDirty: boolean;
+  public get isFlattendedDataDirty(): boolean {
+    return this._isFlattendedDataDirty;
+  }
 
   constructor(width: UInt, height: UInt, x: number, y: number) {
     this.id = generateHashedId(6) as SpriteId;
@@ -51,25 +69,6 @@ export class Sprite {
     this._isMatrixDirty = true;
     this._isFlattendedDataDirty = true;
   }
-  public get isMatrixDirty(): boolean {
-    return this._isMatrixDirty;
-  }
-  public get isFlattendedDataDirty(): boolean {
-    return this._isFlattendedDataDirty;
-  }
-  public get width(): number {
-    return this.rect.width;
-  }
-  public get height(): number {
-    return this.rect.height;
-  }
-
-  private set isMatrixDirty(v: boolean) {
-    this._isMatrixDirty = v;
-  }
-  private set isFlattendedDataDirty(v: boolean) {
-    this._isFlattendedDataDirty = v;
-  }
 
   /**
    * Set new position for this sprite
@@ -77,7 +76,7 @@ export class Sprite {
   public setPosition(newX: number, newY: number) {
     this.transform.position.x = newX;
     this.transform.position.y = newY;
-    this.isMatrixDirty = true; // Update model matrix this frame
+    this._isMatrixDirty = true; // Update model matrix this frame
   }
 
   /**
@@ -94,7 +93,7 @@ export class Sprite {
     }
 
     // Recalculate sprite's flattened data
-    this.isFlattendedDataDirty = true;
+    this._isFlattendedDataDirty = true;
   }
 
   /**
@@ -116,7 +115,7 @@ export class Sprite {
     }
 
     // Recalculate sprite's flattened data
-    this.isFlattendedDataDirty = true;
+    this._isFlattendedDataDirty = true;
   }
 
   /**
@@ -158,7 +157,7 @@ export class Sprite {
     }
 
     // Unmark
-    this.isFlattendedDataDirty = false;
+    this._isFlattendedDataDirty = false;
   }
 
   /**
@@ -190,6 +189,6 @@ export class Sprite {
     modelMatrix.translateXY(-pivotOffsetX, -pivotOffsetY);
 
     // Unmark
-    this.isMatrixDirty = false;
+    this._isMatrixDirty = false;
   }
 }

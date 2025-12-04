@@ -41,8 +41,7 @@ export class CameraController {
       this.zoomElapsed += dt;
       const t = Math.min(this.zoomElapsed / 1, 1);
 
-      const newZoom = lerp(currentZoom, this.targetZoom, t);
-      camera.setZoom(newZoom);
+      camera.zoom = lerp(currentZoom, this.targetZoom, t);
 
       if (t === 1) {
         this.isZooming = false;
@@ -52,15 +51,13 @@ export class CameraController {
 
     if (this.isPanning) {
       const camera = this.camera;
-      const currentPosition = camera.position;
 
       //
       this.panElapsed += dt;
       const t = Math.min(this.panElapsed / 1, 1);
 
-      const newPositionX = lerp(currentPosition.x, this.targetWorld.x, t);
-      const newPositionY = lerp(currentPosition.y, this.targetWorld.y, t);
-      camera.setPosition(newPositionX, newPositionY);
+      camera.x = lerp(camera.x, this.targetWorld.x, t);
+      camera.y = lerp(camera.y, this.targetWorld.y, t);
 
       if (t === 1) {
         this.isPanning = false;
@@ -77,12 +74,10 @@ export class CameraController {
     }
 
     const camera = this.camera;
-    const oldPosition = camera.position;
 
     // Calculate new camera position
-    const newX = oldPosition.x + deltaX * camera.worldPerPixelX;
-    const newY = oldPosition.y - deltaY * camera.worldPerPixelY;
-    camera.setPosition(newX, newY);
+    camera.x = camera.x + deltaX * camera.worldPerPixelX;
+    camera.y = camera.y - deltaY * camera.worldPerPixelY;
   }
 
   public zoom(mousePosition: Vector2, zoomDelta: number) {
@@ -91,23 +86,20 @@ export class CameraController {
       this.zoomElapsed = 0;
       this.isZooming = false;
     }
-
     const camera = this.camera;
 
     // Calculate camera's world position before applying zoom
     const oldCameraPosition = this.camera.screenToWorld(mousePosition.x, mousePosition.y);
 
     // Apply zoom
-    const newZoom = clamp(camera.zoom * Math.pow(this.ZOOM_SPEED, zoomDelta), this.MIN_ZOOM, this.MAX_ZOOM);
-    camera.setZoom(newZoom);
+    camera.zoom = clamp(camera.zoom * Math.pow(this.ZOOM_SPEED, zoomDelta), this.MIN_ZOOM, this.MAX_ZOOM);
 
     // Calculate camera's world position after zoom
     const newCameraPosition = this.camera.screenToWorld(mousePosition.x, mousePosition.y);
 
     // Offset camera so mouse cursor stays on the world grid
-    const dx = oldCameraPosition.x - newCameraPosition.x;
-    const dy = oldCameraPosition.y - newCameraPosition.y;
-    camera.setPosition(camera.position.x + dx, camera.position.y + dy);
+    camera.x += oldCameraPosition.x - newCameraPosition.x;
+    camera.y += oldCameraPosition.y - newCameraPosition.y;
   }
 
   public moveTo(newCameraX: number, newCameraY: number) {

@@ -38,7 +38,7 @@ export class WebGPURenderer {
   /**
    * Renderer is initialized async via init()
    */
-  constructor() {}
+  constructor() { }
 
   /**
    * Initialize the WebGPU renderer and all required resources

@@ -40,8 +40,8 @@ export class Scene {
       // Move the camera
       // camera.setPosition(sprite.transform.position.x, sprite.transform.position.y);
       // camera.setZoom((camera.height / sprite.rect.height) * 0.8);
-      controller.moveTo(sprite.transform.position.x, sprite.transform.position.y);
-      controller.zoomTo((camera.height / sprite.rect.height) * 0.8);
+      controller.moveTo(sprite.x, sprite.y);
+      controller.zoomTo((camera.height / sprite.height) * 0.8);
     }
   }
 

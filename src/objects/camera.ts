@@ -1,5 +1,4 @@
-import type { CameraConfig, UInt, WeakVector2 } from "../types";
-import { Vector2 } from "../utils/vector-2";
+import type { CameraConfig, WeakVector2 } from "../types";
 import { Matrix4 } from "../utils/matrix-4";
 import { Transform } from "./transform";
 import { Viewport } from "../core/viewport";
@@ -9,21 +8,66 @@ export class Camera {
   private readonly viewport: Viewport;
 
   // State
-  private readonly transform: Transform = new Transform();
+  private readonly transform = new Transform();
+  public get x(): number {
+    return this.transform.position.x;
+  }
+  public get y(): number {
+    return this.transform.position.y;
+  }
+  public set x(v: number) {
+    this.transform.position.x = v;
+    this._isMatrixDirty = true;
+  }
+  public set y(v: number) {
+    this.transform.position.y = v;
+    this._isMatrixDirty = true;
+  }
   private aspectRatio: number;
-  private storedWidth: number;
-  private zoomLevel: number;
+  private _width: number;
+  public get width() {
+    return this._width;
+  }
+  public get height() {
+    return this._width / this.aspectRatio;
+  }
+  private _zoom: number;
+  public get zoom() {
+    return this._zoom;
+  }
+  public set zoom(v: number) {
+    if (v <= 0) {
+      console.error("Camera zoom must be positive number.");
+      return;
+    }
+    this._zoom = v;
 
-  private _worldPerPixelX: number;
-  private _worldPerPixelY: number;
+    // Update world per pixel values
+    this.updateWorldPerPixel();
 
-  public isMatrixDirty: boolean;
+    // Set matrices dirty
+    this._isMatrixDirty = true;
+  }
+  private _worldPerPixelX: number = 1;
+  public get worldPerPixelX() {
+    return this._worldPerPixelX;
+  }
+  private _worldPerPixelY: number = 1;
+  public get worldPerPixelY() {
+    return this._worldPerPixelY;
+  }
 
   // Camera matrices
   public readonly projectionMatrix: Matrix4 = new Matrix4();
   public readonly viewMatrix: Matrix4 = new Matrix4();
   public readonly viewProjectionMatrix: Matrix4 = new Matrix4();
   public readonly invViewProjectionMatrix: Matrix4 = new Matrix4();
+
+  // Dirty flags
+  private _isMatrixDirty: boolean;
+  public get isMatrixDirty() {
+    return this._isMatrixDirty;
+  }
 
   constructor(viewport: Viewport, cameraConfig: CameraConfig) {
     this.viewport = viewport;
@@ -32,51 +76,21 @@ export class Camera {
     this.transform.position.x = cameraConfig.position.x;
     this.transform.position.y = cameraConfig.position.y;
     this.aspectRatio = cameraConfig.width / cameraConfig.height;
-    this.storedWidth = cameraConfig.width;
-    this.zoomLevel = cameraConfig.zoom;
+    this._width = cameraConfig.width;
+    this._zoom = cameraConfig.zoom;
 
     // Update world per pixel values
-    this._worldPerPixelX = this.storedWidth / viewport.width / this.zoomLevel;
-    this._worldPerPixelY = this.height / viewport.height / this.zoomLevel;
+    this.updateWorldPerPixel();
 
     // Mark camera matrices dirty
-    this.isMatrixDirty = true;
-  }
-  public get width() {
-    return this.storedWidth;
-  }
-  public get height() {
-    return this.storedWidth / this.aspectRatio;
-  }
-  public get position() {
-    return this.transform.position;
-  }
-  public get zoom() {
-    return this.zoomLevel;
-  }
-  public get worldPerPixelX() {
-    return this._worldPerPixelX;
-  }
-  public get worldPerPixelY() {
-    return this._worldPerPixelY;
+    this._isMatrixDirty = true;
   }
 
-  /**
-   * Set new zoom value
-   */
-  public setZoom(value: number): void {
-    if (value <= 0) {
-      console.error("Camera zoom must be positive number.");
-      return;
-    }
-    this.zoomLevel = value;
-
-    // Update world per pixel values
-    this._worldPerPixelX = this.width / this.viewport.width / this.zoom;
-    this._worldPerPixelY = this.height / this.viewport.height / this.zoom;
-
-    // Set matrices dirty
-    this.isMatrixDirty = true;
+  private updateWorldPerPixel() {
+    const viewport = this.viewport;
+    // Formula: (cWidth / vWidth) * (1 / zoom)
+    this._worldPerPixelX = this.width / (viewport.width * this.zoom);
+    this._worldPerPixelY = this.height / (viewport.height * this.zoom);
   }
 
   /**
@@ -86,20 +100,10 @@ export class Camera {
     this.aspectRatio = width / height;
 
     // Update world per pixel values
-    this._worldPerPixelX = this.width / this.viewport.width / this.zoom;
-    this._worldPerPixelY = this.height / this.viewport.height / this.zoom;
+    this.updateWorldPerPixel();
 
     // Set matrices dirty
-    this.isMatrixDirty = true;
-  }
-
-  /**
-   *
-   */
-  public setPosition(newX: number, newY: number): void {
-    this.transform.position.x = newX;
-    this.transform.position.y = newY;
-    this.isMatrixDirty = true;
+    this._isMatrixDirty = true;
   }
 
   /**
@@ -111,8 +115,8 @@ export class Camera {
     const vY = this.worldPerPixelY * (screenY - this.viewport.height / 2);
 
     // Offset by camera to get the final world position
-    const worldX = this.position.x + vX;
-    const worldY = this.position.y - vY;
+    const worldX = this.transform.position.x + vX;
+    const worldY = this.transform.position.y - vY;
 
     return { x: worldX, y: worldY };
   }
@@ -142,6 +146,6 @@ export class Camera {
     this.invViewProjectionMatrix.invert(this.viewProjectionMatrix.data);
 
     // Matrices have been updated
-    this.isMatrixDirty = false;
+    this._isMatrixDirty = false;
   }
 }
