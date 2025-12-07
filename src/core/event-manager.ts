@@ -1,5 +1,4 @@
-import type { EventID } from "../types/basic-types";
-import type { EventMap, EventType } from "../types/event-types";
+import type { EventID, EventMap, EventType } from "../types/event-types";
 import { generateUUID } from "../utils/math";
 
 // BUSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS!!!!!!!!!!!!!!!!!!!!!!
