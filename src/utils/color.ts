@@ -1,4 +1,3 @@
-import type { UInt8 } from "../types";
 import { clamp } from "../utils/math";
 
 export class Color {

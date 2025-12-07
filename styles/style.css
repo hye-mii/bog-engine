@@ -23,7 +23,7 @@ body {
   height: 100%;
 }
 
-.main-canvas {
+#render-canvas {
   display: block;
   position: relative;
   touch-action: none;

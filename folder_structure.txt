@@ -1,0 +1,51 @@
+.
+├── src/
+│   ├── core/
+│   │   ├── Engine.ts
+│   │   └── Input.ts
+│   ├── managers/
+│   │   ├── InputManager.ts
+│   │   ├── SceneManager.ts
+│   │   └── EventManager.ts
+│   ├── scene/
+│   │   ├── Scene.ts
+│   │   ├── Entity.ts
+│   │   └── Viewport.ts
+│   ├── components/
+│   │   ├── Transform.ts
+│   │   ├── Camera.ts
+│   │   ├── CameraController.ts
+│   │   ├── Light.ts
+│   │   ├── Sprite.ts
+│   │   └── Layer.ts
+│   ├── renderer/
+│   │   ├── Renderer.ts
+│   │   ├── GPUSprite.ts
+│   │   ├── SpritePipeline.ts
+│   │   └── BackgroundPipeline.ts
+│   ├── modifiers/
+│   │   ├── ModifierStack.ts
+│   │   └── Modifier.ts
+│   ├── tools/
+│   │   ├── ToolManager.ts
+│   │   ├── BaseTool.ts
+│   │   ├── SelectTool.ts
+│   │   └── BrushTool.ts
+│   ├── resources/
+│   │   └── AssetManager.ts
+│   ├── ui/
+│   │   ├── UIManager.ts
+│   │   └── theme/
+│   └── utils/
+│       ├── Matrix4.ts
+│       ├── Vector3.ts
+│       ├── Color.ts
+│       ├── Rect.ts
+│       └── MathUtils.ts
+├── assets/
+│   ├── models/
+│   ├── textures/
+│   ├── shaders/
+│   └── fonts/
+└── styles/
+    └── style.css

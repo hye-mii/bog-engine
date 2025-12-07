@@ -1,14 +1,19 @@
-import type { PixelDataRGBA, SpriteId } from "../types";
-import type { Scene } from "./scene";
-import type { Viewport } from "./viewport";
-import type { Sprite } from "../objects/sprite";
-import { GPUSprite } from "../objects/gpu-sprite";
+import type { EventManager } from "../core/event-manager";
+import type { Camera } from "../entities/camera";
+import type { Sprite } from "../entities/sprite";
+import type { Scene } from "../scene/scene";
+import type { Viewport } from "../scene/viewport";
+import type { SpriteID } from "../types/entity-types";
+import { GPUSprite } from "./gpu-sprite";
 
 // Import WGSL shaders
-import backgroundShader from "../shaders/background-shader.wgsl?raw";
-import spriteShader from "../shaders/sprite-shader.wgsl?raw";
+import backgroundShader from "./shaders/background-shader.wgsl?raw";
+import spriteShader from "./shaders/sprite-shader.wgsl?raw";
 
 export class WebGPURenderer {
+  // Event varaibles
+  private readonly _eventManager: EventManager;
+
   // Renderer states
   private initialised: boolean = false;
   private device!: GPUDevice;
@@ -28,7 +33,7 @@ export class WebGPURenderer {
   private backgroundPipelineLayout!: GPUPipelineLayout;
   private backgroundBindGroup!: GPUBindGroup;
 
-  // Sprite resources
+  // // Sprite resources
   private gpuSprites: Map<string, GPUSprite> = new Map();
   private sharedSpritePipeline!: GPURenderPipeline;
   private sharedSpriteBindGroupLayout!: GPUBindGroupLayout;
@@ -38,7 +43,13 @@ export class WebGPURenderer {
   /**
    * Renderer is initialized async via init()
    */
-  constructor() { }
+  constructor(eventManager: EventManager) {
+    this._eventManager = eventManager;
+
+    // Bind events
+    this._eventManager.subscribe("webgpu-renderer", "onSpriteAdded", this.createGPUSprite);
+    this._eventManager.subscribe("webgpu-renderer", "onSpriteDelete", this.destroyGPUSprite);
+  }
 
   /**
    * Initialize the WebGPU renderer and all required resources
@@ -103,37 +114,14 @@ export class WebGPURenderer {
     this.initialised = true;
   }
 
-  /**
-   * Create a GPU sprite for the given sprite object and add it to the renderer GPU sprite map
-   */
-  public createGPUSprite(sprite: Sprite) {
-    if (this.gpuSprites.has(sprite.id)) {
-      console.error("GPU sprite already exists for this sprite.");
-      return;
-    }
-
-    const newGPUSprite = new GPUSprite(this.device, sprite, this.sharedSpriteBindGroupLayout);
-    this.gpuSprites.set(sprite.id, newGPUSprite);
-  }
-
-  /**
-   * Remove the GPU sprite with the given ID from the renderer's GPU sprite map
-   */
-  public destroyGPUSprite(id: SpriteId) {
-    this.gpuSprites.delete(id);
-  }
-
-  /**
-   * Render the given scene to the viewport
-   */
-  public render(viewport: Viewport, scene: Scene) {
+  public render(viewport: Viewport, scene: Scene, activeCamera: Camera) {
     if (!this.initialised) {
-      console.log("Renderer is not initialized!");
+      console.error("Renderer is not initialized!");
       return;
     }
 
     // Update global uniform buffer with viewport/camera data
-    this.uploadGlobalBuffer(viewport);
+    this.uploadGlobalBuffer(viewport, activeCamera);
 
     // Acquire current swap chain texture and create encoder/pass
     const view = this.context.getCurrentTexture().createView();
@@ -161,23 +149,15 @@ export class WebGPURenderer {
     pass.setBindGroup(0, this.globalBindGroup);
     pass.setVertexBuffer(0, this.sharedSpriteBuffer);
 
-    for (const [key, sprite] of scene.sprites) {
+    const sprites = scene.getAllSprites();
+    for (const sprite of sprites) {
       const gpuSprite = this.gpuSprites.get(sprite.id);
       if (!gpuSprite) {
         throw Error(`No GPU sprite found for sprite id:${sprite.id}`);
       }
 
-      // Update sprite flattend data
-      if (sprite.isFlattendedDataDirty) {
-        sprite.updateFlattenedData();
-        this.uploadSpriteTexture(gpuSprite.texture, sprite.flattenedData, sprite.width, sprite.height);
-      }
-
-      // Update GPU sprite uniform if dirty
-      if (sprite.isMatrixDirty) {
-        sprite.updateModelMatrix();
-        gpuSprite.updateUniform(this.device, sprite.modelMatrix.data);
-      }
+      // gpuSprite.uploadSpriteTexture(this.device, gpuSprite.texture, sprite.flattenedData, sprite.width, sprite.height);
+      // gpuSprite.updateUniform(this.device, sprite.modelMatrix.data);
 
       pass.setBindGroup(1, gpuSprite.bindGroup);
       pass.draw(6);
@@ -189,58 +169,72 @@ export class WebGPURenderer {
   }
 
   /**
-   * Upload pixel data to the GPU texture
+   * Create a GPU sprite for the given sprite object and add it to the renderer GPU sprite map
    */
-  private uploadSpriteTexture(texture: GPUTexture, pixelData: PixelDataRGBA, width: number, height: number) {
-    this.device.queue.writeTexture(
-      { texture: texture },
-      pixelData as GPUAllowSharedBufferSource,
-      {
-        offset: 0,
-        bytesPerRow: width * 4,
-        rowsPerImage: height,
-      },
-      {
-        width: width,
-        height: height,
-        depthOrArrayLayers: 1,
-      }
-    );
-  }
+  public createGPUSprite = (sprite: Sprite) => {
+    if (this.gpuSprites.has(sprite.id)) {
+      console.error("GPU sprite already exists for this sprite.");
+      return;
+    }
+
+    const newGPUSprite = new GPUSprite(this.device, sprite, this.sharedSpriteBindGroupLayout);
+    this.gpuSprites.set(sprite.id, newGPUSprite);
+  };
+
+  /**
+   * Remove the GPU sprite with the given ID from the renderer's GPU sprite map
+   */
+  public destroyGPUSprite = (id: SpriteID) => {
+    this.gpuSprites.delete(id);
+  };
 
   /**
    * Uploads global uniform buffer for the current viewport and camera
    */
-  private uploadGlobalBuffer(viewport: Viewport) {
-    const camera = viewport.camera;
-
-    // Handle camera's matrix recalculation
-    if (camera.isMatrixDirty) {
-      camera.updateMatrices();
-    }
-
+  private uploadGlobalBuffer(viewport: Viewport, activeCamera: Camera) {
     const cameraBufferSize = 144;
     const globalData = new Float32Array(cameraBufferSize / 4);
 
     // Camera view projection matrix
-    globalData.set(camera.viewProjectionMatrix.data, 0);
+    globalData.set(activeCamera.viewProjectionMatrix.data, 0);
 
     // Camera inverse view projection matrix
-    globalData.set(camera.invViewProjectionMatrix.data, 16);
+    globalData.set(activeCamera.invViewProjectionMatrix.data, 16);
 
     // Screen size
     globalData[32] = viewport.width;
     globalData[33] = viewport.height;
 
     // World unit per pixel
-    const WU = viewport.width / camera.width;
-    globalData[34] = WU * camera.zoom;
+    globalData[34] = activeCamera.worldPerPixelX;
+    globalData[35] = activeCamera.worldPerPixelY;
 
     this.device.queue.writeBuffer(this.globalUniformBuffer, 0, globalData.buffer);
   }
 
+  /**
+   * Upload pixel data to the GPU texture
+   */
+  // private uploadSpriteTexture(texture: GPUTexture, pixelData: PixelDataRGBA, width: number, height: number) {
+  //   this.device.queue.writeTexture(
+  //     { texture: texture },
+  //     pixelData as GPUAllowSharedBufferSource,
+  //     {
+  //       offset: 0,
+  //       bytesPerRow: width * 4,
+  //       rowsPerImage: height,
+  //     },
+  //     {
+  //       width: width,
+  //       height: height,
+  //       depthOrArrayLayers: 1,
+  //     }
+  //   );
+  // }
+
   // ========================================================
   // -------------- Private Static Helpers ------------------
+  // ========================================================
 
   /**
    * Create full quad vertex buffer and upload its data to the GPU device
@@ -394,8 +388,8 @@ export class WebGPURenderer {
     backgroundData[7] = 1.0;
 
     // gridSize in world unit
-    backgroundData[8] = 16.0;
-    backgroundData[9] = 16.0;
+    backgroundData[8] = 8.0;
+    backgroundData[9] = 8.0;
 
     // lineThickness in pixels
     backgroundData[10] = 1;

@@ -1,14 +1,8 @@
-import type { SettingsType, SpriteId, UInt } from "../types";
-import { TweenScheduler } from "./tween-scheduler";
-import { WebGPURenderer } from "./renderer";
-import { InputManager } from "./input-manager";
-import { UIManager } from "./ui-manager";
-import { Viewport } from "./viewport";
-import { Scene } from "./scene";
-import { Sprite } from "../objects/sprite";
-import { Vector2 } from "../utils/vector-2";
-
-import { CameraTests } from "../../test/camera.test";
+import { EventManager } from "./event-manager";
+import { InputManager } from "../input/input-manager";
+import { SceneManager } from "../scene/scene-manager";
+import { WebGPURenderer } from "../renderer/webgpu-renderer";
+import { Viewport } from "../scene/viewport";
 
 // Custom comments expressions used in the project
 // ! notice
@@ -19,174 +13,117 @@ import { CameraTests } from "../../test/camera.test";
 // // Redacted
 
 export class BogEngine {
-	private readonly settings: SettingsType;
-	public readonly viewportElement: HTMLDivElement;
-	public readonly canvasElement: HTMLCanvasElement;
+  // DOM dependencies
+  public readonly viewportElement: HTMLDivElement;
+  public readonly canvasElement: HTMLCanvasElement;
 
-	// Core components
-	public readonly tweenScheduler: TweenScheduler;
-	public readonly renderer: WebGPURenderer;
-	public readonly input: InputManager;
-	public readonly ui: UIManager;
-	public readonly viewport: Viewport;
-	public readonly scene: Scene;
+  // Managers
+  public readonly sceneManager: SceneManager;
+  public readonly inputManager: InputManager;
+  public readonly eventManager: EventManager;
 
-	// Internal states
-	private brushSize: number = 1;
-	private prevMousePosition: Vector2 = new Vector2(0, 0);
-	private mousePosition: Vector2 = new Vector2(0, 0);
-	private mouseDelta: Vector2 = new Vector2(0, 0);
+  // Viewport and renderer
+  public readonly viewport: Viewport;
+  public readonly renderer: WebGPURenderer;
 
-	constructor(settings: SettingsType, viewportElement: HTMLDivElement) {
-		// ------ Store initial configuration ------
-		this.settings = settings;
-		this.viewportElement = viewportElement;
-		this.canvasElement = BogEngine.createCanvasElement();
+  // Main loop variables
+  private lastTime: number = 0;
 
-		// Attach canvas to viewport
-		this.viewportElement.appendChild(this.canvasElement);
+  constructor() {
+    // Create viewport and canvas elements
+    this.viewportElement = BogEngine.createViewportElement();
+    this.canvasElement = BogEngine.createCanvasElement();
 
-		// ------ Instantiate Core Components ------
-		this.tweenScheduler = new TweenScheduler();
-		this.renderer = new WebGPURenderer();
-		this.input = new InputManager(this.canvasElement, this.viewportElement);
-		this.ui = new UIManager();
-		this.viewport = new Viewport(this.canvasElement.width, this.canvasElement.height, settings.camera);
-		this.scene = new Scene();
-	}
+    // Attach canvas to viewport
+    this.viewportElement.appendChild(this.canvasElement);
 
-	public async init() {
-		// Initialise renderer
-		await this.renderer.init(this.canvasElement);
+    // Instantiate Core Managers
+    this.eventManager = new EventManager();
+    this.sceneManager = new SceneManager(this.eventManager);
+    this.inputManager = new InputManager(this.eventManager, this.viewportElement, this.canvasElement);
 
-		// Bind Event Listeners
-		BogEngine.bindListeners(this);
+    // Instantiate Viewport and Renderer
+    this.viewport = new Viewport(this.eventManager, this.canvasElement.width, this.canvasElement.height);
+    this.renderer = new WebGPURenderer(this.eventManager);
+  }
 
-		// Initialise input manager
-		this.input.init();
+  /**
+   * Initialize app
+   */
+  public async init() {
+    // Initialise Renderer
+    await this.renderer.init(this.canvasElement);
 
-		// Add a default scene
-		this.scene.addSprite(16 as UInt, 16 as UInt, 0, 0);
+    // Initialise Input Manager
+    this.inputManager.init();
 
-		// Start main loop
-		requestAnimationFrame(this.loop);
-	}
+    // Load a new scene
+    this.sceneManager.loadScene();
 
-	private static createCanvasElement() {
-		const canvasElement = document.createElement("canvas");
-		canvasElement.id = "main-canvas";
-		canvasElement.classList.add("main-canvas");
-		canvasElement.width = window.innerWidth;
-		canvasElement.height = window.innerHeight;
-		return canvasElement;
-	}
+    // Set viewport's active camera
+    const activeController = this.sceneManager.getActiveCameraController();
+    if (!activeController) {
+      throw Error("No active camera controller found in the scene!");
+    }
+    this.viewport.init(activeController);
 
-	private static bindListeners(engine: BogEngine) {
-		// Setup logic to handle window resizing
-		engine.input.addResizeListener(() => {
-			// Get new canvas size from the window
-			const width = window.innerWidth;
-			const height = window.innerHeight;
+    // Start the main loop
+    requestAnimationFrame(this.loop);
+  }
 
-			// Update canvas element
-			engine.canvasElement.width = width;
-			engine.canvasElement.height = height;
+  // ========================================================
+  // ------------------ Main App Loop -----------------------
+  // ========================================================
 
-			// Resize viewport
-			engine.viewport.resize(width, height);
-		});
+  /**
+   * process-input -> update-event-manager -> update-scene -> render-scene
+   */
+  public loop = (time: DOMHighResTimeStamp) => {
+    const dt = (time - this.lastTime) / 1000;
+    this.lastTime = time;
 
-		// Bind event listeners to inform renderer to create and remove GPU Sprites
-		engine.scene.addSpriteAddedListener((sprite: Sprite) => {
-			engine.renderer.createGPUSprite(sprite);
-		});
-		engine.scene.addSpriteRemovedListener((id: SpriteId) => {
-			engine.renderer.destroyGPUSprite(id);
-		});
-	}
+    // Process input this frame
+    this.inputManager.processInput(dt);
 
-	private loop = () => {
-		const dt = 0.016;
+    // Update event manager
+    // this.eventManager.update(dt);
 
-		this.viewport.cameraController.update(dt);
+    // Update active scene
+    this.sceneManager.updateScene(dt);
 
-		//
-		// this.viewport.cameraController.update(dt);
+    // Render this scene
+    const scene = this.sceneManager.getActiveScene();
+    if (scene) {
+      const activeCamera = scene.getActiveCamera();
+      if (activeCamera) {
+        this.renderer.render(this.viewport, scene, activeCamera);
+      } else {
+        console.error("No active camera to render!");
+      }
+    } else {
+      if (!scene) console.error("No active scene to render!");
+    }
 
-		// Process input this frame
-		this.processInput();
+    // Continue the loop
+    requestAnimationFrame(this.loop);
+  };
 
-		// Render this frame
-		if (this.scene) {
-			this.renderer.render(this.viewport, this.scene);
-		}
+  // ========================================================
+  // -------------- Private Static Helpers ------------------
+  // ========================================================
 
-		// Continue the loop
-		requestAnimationFrame(this.loop);
-	};
+  private static createViewportElement(): HTMLDivElement {
+    const outViewport = document.createElement("div");
+    outViewport.id = "viewport";
+    document.body.appendChild(outViewport);
+    return outViewport;
+  }
 
-	private processInput() {
-		// --------- Retreive Raw Inputs ---------
-
-		const rawClientX = this.input.rawClientX;
-		const rawClientY = this.input.rawClientY;
-		const rawScrollDeltaY = this.input.rawScrollDeltaY;
-		this.input.rawScrollDeltaY = 0;
-		const isAuxiliaryButtonDown = this.input.isAuxiliaryButtonDown;
-		const isControlKeyDown = this.input.isControlKeyDown;
-		const isShiftKeyDown = this.input.isShiftKeyDown;
-		const isAltKeyDown = this.input.isAltKeyDown;
-		const doubleClick = this.input.doubleClick;
-		this.input.doubleClick = false;
-
-		// --------- Calculate Input ---------
-		const prevMousePosition = this.prevMousePosition;
-		const mousePosition = this.mousePosition;
-		const mouseDelta = this.mouseDelta;
-
-		// Update previous mouse screen position
-		prevMousePosition.x = mousePosition.x;
-		prevMousePosition.y = mousePosition.y;
-
-		// Calculate new mouse screen position
-		const rect = this.canvasElement.getBoundingClientRect();
-		mousePosition.x = Math.floor(rawClientX - rect.left); // Offset by canvas' position
-		mousePosition.y = Math.floor(rawClientY - rect.top);
-
-		// Calculate and update mouse delta (difference btw previous and current mouse position)
-		mouseDelta.x = prevMousePosition.x - mousePosition.x;
-		mouseDelta.y = prevMousePosition.y - mousePosition.y;
-
-		// ! testing
-		// console.log(`Raw Input: x:${mouseDelta.x} y:${mouseDelta.y} \n Mouse Coords: x:${mousePosition.x} y:${mousePosition.y}`);
-
-		// --------- Process Input ---------
-
-		// Handle camera pan and zoom
-		const camera = this.viewport.camera;
-		const controller = this.viewport.cameraController;
-		if (isAuxiliaryButtonDown && (mouseDelta.x !== 0 || mouseDelta.y !== 0)) {
-			controller.pan(mouseDelta.x, mouseDelta.y);
-		}
-		if (rawScrollDeltaY !== 0) {
-			controller.zoom(mousePosition, -rawScrollDeltaY);
-		}
-
-		// Handle double click event
-		if (doubleClick) {
-			this.scene.onDoubleClick(mousePosition, camera, controller);
-		}
-
-		// ! testing
-		// CameraTests.screenToWorld(
-		//   camera,
-		//   this.viewport.width,
-		//   this.viewport.height,
-		//   camera.width,
-		//   camera.height,
-		//   camera.position.x,
-		//   camera.position.y,
-		//   camera.zoom
-		// );
-	}
+  private static createCanvasElement(): HTMLCanvasElement {
+    const outCanvas = document.createElement("canvas");
+    outCanvas.id = "canvas";
+    outCanvas.width = window.innerWidth;
+    outCanvas.height = window.innerHeight;
+    return outCanvas;
+  }
 }

@@ -2,7 +2,8 @@ struct GlobalUniforms {
     viewProjection : mat4x4f,
     inverseViewProjection : mat4x4f,
     screenSize : vec2f,
-    worldUnitPerPixel : f32
+    worldUnitPerPixelX : f32,
+    worldUnitPerPixelY : f32
 };
 struct BackgroundUniforms {
     backgroundColor : vec4f,
@@ -38,14 +39,15 @@ fn fs_main(in : VertexOut) -> @location(0) vec4f {
     //Perspective divide
     var worldPos : vec2f = worldPos4f.xy / worldPos4f.w;
 
-    let lineWorldThickness = u.lineThickness / global.worldUnitPerPixel;
+    let lineWorldThicknessX = u.lineThickness * global.worldUnitPerPixelX;
+    let lineWorldThicknessY = u.lineThickness * global.worldUnitPerPixelY;
     var gridSize = u.gridSize;
 
     let wx = worldPos.x - gridSize.x * floor(worldPos.x / gridSize.x);
     let wy = worldPos.y - gridSize.y * floor(worldPos.y / gridSize.y);
 
-    let nearGridX = wx < lineWorldThickness || (gridSize.x - wx) < lineWorldThickness;
-    let nearGridY = wy < lineWorldThickness || (gridSize.y - wy) < lineWorldThickness;
+    let nearGridX = wx < lineWorldThicknessX || (gridSize.x - wx) < lineWorldThicknessX;
+    let nearGridY = wy < lineWorldThicknessY || (gridSize.y - wy) < lineWorldThicknessY;
     let isLine = nearGridX || nearGridY;
 
     return select(u.backgroundColor, u.lineColor, isLine);

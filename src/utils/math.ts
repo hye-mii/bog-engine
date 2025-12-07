@@ -1,5 +1,7 @@
-export function generateHashedId(length: number): string {
-  return crypto.randomUUID();
+import type { UUID } from "../types/basic-types";
+
+export function generateUUID(): UUID {
+  return crypto.randomUUID() as UUID;
 }
 
 export function seededFromUUID(uuid: string) {
@@ -13,3 +15,7 @@ export function clamp(value: number, min: number, max: number): number {
 export function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }
+
+// export function generateHashedId(): string {
+//   return null!;
+// }

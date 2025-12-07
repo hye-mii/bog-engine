@@ -1,5 +1,5 @@
-import type { PixelDataBGRA } from "../types";
-import type { Sprite } from "./sprite";
+import type { Sprite } from "../entities/sprite";
+import type { PixelDataRGBA } from "../types/basic-types";
 
 export class GPUSprite {
   public id: string;
@@ -13,12 +13,33 @@ export class GPUSprite {
     this.id = sprite.id;
 
     this.sampler = GPUSprite.createSampler(device);
-    this.texture = GPUSprite.createTexture(device, sprite.rect.width, sprite.rect.height);
+    this.texture = GPUSprite.createTexture(device, sprite.width, sprite.height);
     this.textureView = GPUSprite.createTextureView(this.texture);
     this.uniformBuffer = GPUSprite.createUniformBuffer(device);
     this.bindGroup = GPUSprite.createBindGroup(device, sharedBindGroupLayout, this.uniformBuffer, this.texture, this.sampler);
 
+    this.uploadSpriteTexture(device, this.texture, sprite.flattenedData, sprite.width, sprite.height);
     this.updateUniform(device, sprite.modelMatrix.data);
+  }
+
+  /**
+   * Upload pixel data to the GPU texture
+   */
+  public uploadSpriteTexture(device: GPUDevice, texture: GPUTexture, pixelData: PixelDataRGBA, width: number, height: number) {
+    device.queue.writeTexture(
+      { texture: texture },
+      pixelData as GPUAllowSharedBufferSource,
+      {
+        offset: 0,
+        bytesPerRow: width * 4,
+        rowsPerImage: height,
+      },
+      {
+        width: width,
+        height: height,
+        depthOrArrayLayers: 1,
+      }
+    );
   }
 
   public updateUniform(device: GPUDevice, modelMatrixData: Float32Array) {
