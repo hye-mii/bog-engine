@@ -114,14 +114,14 @@ export class WebGPURenderer {
     this.initialised = true;
   }
 
-  public render(viewport: Viewport, scene: Scene, activeCamera: Camera) {
+  public render(viewport: Viewport, scene: Scene) {
     if (!this.initialised) {
       console.error("Renderer is not initialized!");
       return;
     }
 
     // Update global uniform buffer with viewport/camera data
-    this.uploadGlobalBuffer(viewport, activeCamera);
+    this.uploadGlobalBuffer(viewport);
 
     // Acquire current swap chain texture and create encoder/pass
     const view = this.context.getCurrentTexture().createView();
@@ -191,23 +191,24 @@ export class WebGPURenderer {
   /**
    * Uploads global uniform buffer for the current viewport and camera
    */
-  private uploadGlobalBuffer(viewport: Viewport, activeCamera: Camera) {
+  private uploadGlobalBuffer(viewport: Viewport) {
     const cameraBufferSize = 144;
     const globalData = new Float32Array(cameraBufferSize / 4);
+    const view = viewport.getActiveView();
 
     // Camera view projection matrix
-    globalData.set(activeCamera.viewProjectionMatrix.data, 0);
+    globalData.set(view.camera.viewProjectionMatrix.data, 0);
 
     // Camera inverse view projection matrix
-    globalData.set(activeCamera.invViewProjectionMatrix.data, 16);
+    globalData.set(view.camera.invViewProjectionMatrix.data, 16);
 
     // Screen size
-    globalData[32] = viewport.width;
-    globalData[33] = viewport.height;
+    globalData[32] = view.width;
+    globalData[33] = view.height;
 
     // World unit per pixel
-    globalData[34] = activeCamera.worldPerPixelX;
-    globalData[35] = activeCamera.worldPerPixelY;
+    globalData[34] = view.worldPerPixelX;
+    globalData[35] = view.worldPerPixelY;
 
     this.device.queue.writeBuffer(this.globalUniformBuffer, 0, globalData.buffer);
   }

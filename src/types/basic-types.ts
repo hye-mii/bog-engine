@@ -7,3 +7,10 @@ export interface WeakVector2 {
   x: number;
   y: number;
 }
+
+/** A plain readonly Vector2 */
+export interface WeakVector3 {
+  x: number;
+  y: number;
+  z: number;
+}

@@ -1,3 +1,4 @@
+import type { Camera } from "../entities/camera";
 import type { Sprite } from "../entities/sprite";
 import type { SpriteID } from "./entity-types";
 
@@ -8,7 +9,9 @@ export type EventMap = {
   zoomCamera: (mouseX: number, mouseY: number, zoomDelta: number) => void;
   resizeViewport: (width: number, height: number) => void;
 
+  onCameraCreated: (camera: Camera) => void;
+
   onSpriteAdded: (sprite: Sprite) => void;
   onSpriteDelete: (spriteID: SpriteID) => void;
 };
-export type EventType = keyof EventMap; 
+export type EventType = keyof EventMap;

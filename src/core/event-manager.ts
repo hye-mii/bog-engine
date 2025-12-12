@@ -8,6 +8,8 @@ export class EventManager {
     zoomCamera: new Map(),
     resizeViewport: new Map(),
 
+    onCameraCreated: new Map(),
+
     onSpriteAdded: new Map(),
     onSpriteDelete: new Map(),
   };

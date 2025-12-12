@@ -60,13 +60,6 @@ export class BogEngine {
     // Load a new scene
     this.sceneManager.loadScene();
 
-    // Set viewport's active camera
-    const activeController = this.sceneManager.getActiveScene()?.cameraControllers[0];
-    if (!activeController) {
-      throw Error("No active camera controller found in the scene!");
-    }
-    this.viewport.init(activeController);
-
     // Start the main loop
     requestAnimationFrame(this.loop);
   }
@@ -76,7 +69,7 @@ export class BogEngine {
   // ========================================================
 
   /**
-   * process-input -> update-event-manager -> update-scene -> render-scene
+   * process-input -> update-scene -> update-viewport -> render-scene
    */
   public loop = (time: DOMHighResTimeStamp) => {
     const dt = (time - this.lastTime) / 1000;
@@ -85,24 +78,14 @@ export class BogEngine {
     // Process input this frame
     this.inputManager.processInput(dt);
 
-    // Update event manager
-    // this.eventManager.update(dt);
-
     // Update active scene
     this.sceneManager.updateScene(dt);
 
+    // Update viewport
+    this.viewport.update(dt);
+
     // Render this scene
-    const scene = this.sceneManager.getActiveScene();
-    if (scene) {
-      const activeCamera = scene.cameras[0];
-      if (activeCamera) {
-        this.renderer.render(this.viewport, scene, activeCamera);
-      } else {
-        console.error("No active camera to render!");
-      }
-    } else {
-      if (!scene) console.error("No active scene to render!");
-    }
+    this.renderer.render(this.viewport, this.sceneManager.getActiveScene());
 
     // Continue the loop
     requestAnimationFrame(this.loop);

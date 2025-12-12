@@ -1,3 +1,6 @@
+import type { WeakVector2, WeakVector3 } from "../types/basic-types";
+import type { Vector2 } from "./vector-2";
+
 export class Vector3 {
   private _x: number;
   private _y: number;
@@ -64,10 +67,16 @@ export class Vector3 {
     return out;
   }
 
-  public lerp(target: Vector3, t: number): this {
+  public lerp(target: Vector3 | WeakVector3, t: number): this {
     this.x += (target.x - this.x) * t;
     this.y += (target.y - this.y) * t;
     this.z += (target.z - this.z) * t;
+    return this;
+  }
+
+  public lerpXY(target: Vector2 | Vector3 | WeakVector2, t: number): this {
+    this.x += (target.x - this.x) * t;
+    this.y += (target.y - this.y) * t;
     return this;
   }
 }
