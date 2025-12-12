@@ -61,7 +61,7 @@ export class BogEngine {
     this.sceneManager.loadScene();
 
     // Set viewport's active camera
-    const activeController = this.sceneManager.getActiveCameraController();
+    const activeController = this.sceneManager.getActiveScene()?.cameraControllers[0];
     if (!activeController) {
       throw Error("No active camera controller found in the scene!");
     }
@@ -94,7 +94,7 @@ export class BogEngine {
     // Render this scene
     const scene = this.sceneManager.getActiveScene();
     if (scene) {
-      const activeCamera = scene.getActiveCamera();
+      const activeCamera = scene.cameras[0];
       if (activeCamera) {
         this.renderer.render(this.viewport, scene, activeCamera);
       } else {

@@ -1,62 +1,71 @@
 .
-├─ main.ts
+├── src/
+│   ├─ main.ts
+│   ├─ core/
+│   │   ├─ bog-engine.ts                    # central engine loop & orchestration
+│   │   └─ event-manager.ts                 # event bus for global pub/sub
+│   │
+│   ├─ entities/
+│   │   ├─ entity.ts                        # base object
+│   │   ├─ sprite.ts                        # drawable pixel object
+│   │   ├─ camera-controller.ts             # handles camera movement logic
+│   │   └─ camera.ts                        # stores camera projection & view settings
+│   │
+│   ├─ input/
+│   │   ├─ input-manager.ts                 # processes raw device inputs → emits events
+│   │   └─ devices/
+│   │       ├─ dom-device.ts                # listens to DOM events
+│   │       ├─ keyboard-device.ts           # key states & transitions
+│   │       └─ mouse-device.ts              # pointer movement & buttons
+│   │
+│   ├─ modifiers/
+│   │   └─ ...                              # sprite/scene modifier stack system
+│   │
+│   ├─ renderer/
+│   │   ├─ gpu-sprite.ts                    # GPU-side sprite representation
+│   │   ├─ webgpu-renderer.ts               # WebGPU-based rendering pipeline
+│   │   └─ shaders/
+│   │       ├─ background-shader.wgsl
+│   │       ├─ checkboard.wgsl
+│   │       └─ sprite-shader.wgsl
+│   │
+│   ├─ resources/
+│   │   └─ ...                              # loaders, cached assets, helpers
+│   │
+│   ├─ scene/
+│   │   ├─ layer.ts                         # ordered render layers
+│   │   ├─ scene-manager.ts                 # registers, loads, swaps scenes
+│   │   ├─ scene.ts                         # holds entities + update/render flow
+│   │   └─ viewport.ts                      # world-to-screen mapping
+│   │
+│   ├─ tools/
+│   │   └─ brush.ts                         # basic painting logic
+│   │
+│   ├─ types/
+│   │   ├─ basic-types.ts                   # shared primitives
+│   │   ├─ entity-types.ts                  # entity metadata
+│   │   ├─ event-types.ts                   # all event payload shapes
+│   │   └─ input-types.ts                   # typed keystates, mouse actions, etc.
+│   │
+│   ├─ ui/
+│   │   └─ ...                              # UI components, panels, overlays
+│   │
+│   └─ utils/
+│      ├─ color.ts
+│      ├─ math.ts
+│      ├─ matrix-4.ts
+│      ├─ quaternion.ts
+│      ├─ rect.ts
+│      ├─ transform.ts
+│      ├─ vector-2.ts
+│      ├─ vector-3.ts
+│      └─ vector-4.ts
 │
-├─ core/
-│  ├─ bog-engine.ts                    # central engine loop & orchestration
-│  └─ event-manager.ts                 # event bus for global pub/sub
+├── assets/
+│   ├── models/
+│   ├── textures/
+│   ├── shaders/
+│   └── fonts/
 │
-├─ entities/
-│  ├─ entity.ts                        # base object
-│  ├─ sprite.ts                        # drawable pixel object
-│  ├─ camera-controller.ts             # handles camera movement logic
-│  └─ camera.ts                        # stores camera projection & view settings
-│
-├─ input/
-│  ├─ input-manager.ts                 # processes raw device inputs → emits events
-│  └─ devices/
-│     ├─ dom-device.ts                 # listens to DOM events
-│     ├─ keyboard-device.ts            # key states & transitions
-│     └─ mouse-device.ts               # pointer movement & buttons
-│
-├─ modifiers/
-│  └─ ...                              # sprite/scene modifier stack system
-│
-├─ renderer/
-│  ├─ gpu-sprite.ts                    # GPU-side sprite representation
-│  ├─ webgpu-renderer.ts               # WebGPU-based rendering pipeline
-│  └─ shaders/
-│     ├─ background-shader.wgsl
-│     ├─ checkboard.wgsl
-│     └─ sprite-shader.wgsl
-│
-├─ resources/
-│  └─ ...                              # loaders, cached assets, helpers
-│
-├─ scene/
-│  ├─ layer.ts                         # ordered render layers
-│  ├─ scene-manager.ts                 # registers, loads, swaps scenes
-│  ├─ scene.ts                         # holds entities + update/render flow
-│  └─ viewport.ts                      # world-to-screen mapping
-│
-├─ tools/
-│  └─ brush.ts                         # basic painting logic
-│
-├─ types/
-│  ├─ basic-types.ts                   # shared primitives
-│  ├─ entity-types.ts                  # entity metadata
-│  ├─ event-types.ts                   # all event payload shapes
-│  └─ input-types.ts                   # typed keystates, mouse actions, etc.
-│
-├─ ui/
-│  └─ ...                              # UI components, panels, overlays
-│
-└─ utils/
-   ├─ color.ts
-   ├─ math.ts
-   ├─ matrix-4.ts
-   ├─ quaternion.ts
-   ├─ rect.ts
-   ├─ transform.ts
-   ├─ vector-2.ts
-   ├─ vector-3.ts
-   └─ vector-4.ts
+└── styles/
+    └── style.css

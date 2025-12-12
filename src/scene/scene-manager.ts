@@ -1,5 +1,4 @@
 import type { EventManager } from "../core/event-manager";
-import type { CameraController } from "../entities/camera-controller";
 import { Scene } from "../scene/scene";
 import { Vector2 } from "../utils/vector-2";
 
@@ -47,9 +46,5 @@ export class SceneManager {
 
   public getActiveScene(): Scene | null {
     return this.activeScene;
-  }
-
-  public getActiveCameraController(): CameraController | undefined {
-    return this.activeScene?.getAnyCameraController();
   }
 }

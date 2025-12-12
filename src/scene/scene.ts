@@ -9,61 +9,58 @@ export class Scene {
   // Event varaibles
   private readonly _eventManager: EventManager;
 
-  private activeCamera: Camera | null = null;
-  private readonly sprites: Map<string, Sprite> = new Map();
-  private readonly cameras: Map<string, Camera> = new Map();
-  private readonly cameraControllers: Map<string, CameraController> = new Map();
+  private _activeCamera: Camera | null = null;
+  private readonly _sprites: Map<string, Sprite> = new Map();
+  private readonly _cameras: Map<string, Camera> = new Map();
+  private readonly _cameraControllers: Map<string, CameraController> = new Map();
 
   constructor(eventManager: EventManager) {
     this._eventManager = eventManager;
   }
-
-  public update(dt: number) {
-    this.sprites.forEach((sprite) => sprite.update(dt));
-    this.cameras.forEach((camera) => camera.update(dt));
-    this.cameraControllers.forEach((controller) => controller.update(dt));
+  public get sprites(): Sprite[] {
+    return [...this._sprites.values()];
+  }
+  public get cameras(): Camera[] {
+    return [...this._cameras.values()];
+  }
+  public get cameraControllers(): CameraController[] {
+    return [...this._cameraControllers.values()];
   }
 
-  public getActiveCamera(): Camera | null {
-    return this.activeCamera;
+  public update(dt: number) {
+    this._sprites.forEach((sprite) => sprite.update(dt));
+    this._cameras.forEach((camera) => camera.update(dt));
+    this._cameraControllers.forEach((controller) => controller.update(dt));
   }
 
   public getSpriteByID(id: UUID): Sprite | undefined {
-    return this.sprites.get(id);
+    return this._sprites.get(id);
   }
 
   public getCameraByID(id: UUID): Camera | undefined {
-    return this.cameras.get(id);
+    return this._cameras.get(id);
   }
 
   public getCameraControllerByID(id: UUID): CameraController | undefined {
-    return this.cameraControllers.get(id);
-  }
-
-  public getAnyCameraController(): CameraController | undefined {
-    return this.cameraControllers.values().next().value;
-  }
-
-  public getAllSprites(): Sprite[] {
-    return [...this.sprites.values()];
+    return this._cameraControllers.get(id);
   }
 
   public createCamera(cameraConfig: CameraConfig, isActiveCamera: boolean): UUID {
     const newCamera = new Camera(cameraConfig);
-    this.cameras.set(newCamera.id, newCamera);
-    if (isActiveCamera) this.activeCamera = newCamera;
+    this._cameras.set(newCamera.id, newCamera);
+    if (isActiveCamera) this._activeCamera = newCamera;
     return newCamera.id;
   }
 
   public createCameraController(controllerConfig: CameraControllerConfig, cameraToAttach: Camera): UUID {
     const newController = new CameraController(controllerConfig, cameraToAttach);
-    this.cameraControllers.set(newController.id, newController);
+    this._cameraControllers.set(newController.id, newController);
     return newController.id;
   }
 
   public createSprite(width: number, height: number, x: number, y: number): UUID {
     const newSprite = new Sprite(width, height, x, y);
-    this.sprites.set(newSprite.id, newSprite);
+    this._sprites.set(newSprite.id, newSprite);
 
     // Notify event manager
     this._eventManager.fire("onSpriteAdded", newSprite);

@@ -149,7 +149,7 @@ export class WebGPURenderer {
     pass.setBindGroup(0, this.globalBindGroup);
     pass.setVertexBuffer(0, this.sharedSpriteBuffer);
 
-    const sprites = scene.getAllSprites();
+    const sprites = scene.sprites;
     for (const sprite of sprites) {
       const gpuSprite = this.gpuSprites.get(sprite.id);
       if (!gpuSprite) {
