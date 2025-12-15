@@ -1,5 +1,5 @@
-import type { Sprite } from "../entities/sprite";
-import type { PixelDataRGBA } from "../types/basic-types";
+import type { Sprite } from "../../entities/sprite";
+import type { PixelDataRGBA } from "../../types/basic-types";
 
 export class GPUSprite {
   public id: string;

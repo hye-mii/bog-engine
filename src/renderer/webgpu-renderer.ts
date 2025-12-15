@@ -1,10 +1,12 @@
 import type { EventManager } from "../core/event-manager";
-import type { Camera } from "../entities/camera";
 import type { Sprite } from "../entities/sprite";
 import type { Scene } from "../scene/scene";
 import type { Viewport } from "../scene/viewport";
 import type { SpriteID } from "../types/entity-types";
-import { GPUSprite } from "./gpu-sprite";
+import { createGlobalResources, type GlobalPassResources } from "./resources/global-pass-resources";
+import { createBackgroundResources, type BackgroundPassResources } from "./resources/background-pass-resources";
+import { createSpriteResources, type SpritePassResources } from "./resources/sprite-pass-resources";
+import { GPUSprite } from "./resources/gpu-sprite";
 
 // Import WGSL shaders
 import backgroundShader from "./shaders/background-shader.wgsl?raw";
@@ -22,25 +24,18 @@ export class WebGPURenderer {
 
   // Global resources
   private quadVertexBuffer!: GPUBuffer;
-  private globalUniformBuffer!: GPUBuffer;
-  private globalBindGroupLayout!: GPUBindGroupLayout;
-  private globalBindGroup!: GPUBindGroup;
+  private globalResources!: GlobalPassResources;
+  private globalUniformData = new Float32Array(144 / 4);
 
   // Background resources
-  private backgroundUniformBuffer!: GPUBuffer;
-  private backgroundPipeline!: GPURenderPipeline;
-  private backgroundBindGroupLayout!: GPUBindGroupLayout;
-  private backgroundPipelineLayout!: GPUPipelineLayout;
-  private backgroundBindGroup!: GPUBindGroup;
+  private backgroundResources!: BackgroundPassResources;
 
-  // // Sprite resources
+  // Sprite resources
+  private sharedSpriteResources!: SpritePassResources;
   private gpuSprites: Map<string, GPUSprite> = new Map();
-  private sharedSpritePipeline!: GPURenderPipeline;
-  private sharedSpriteBindGroupLayout!: GPUBindGroupLayout;
-  private sharedSpritePipelineLayout!: GPUPipelineLayout;
-  private sharedSpriteBuffer!: GPUBuffer;
 
   /**
+   * Setup events for on sprite add and remove
    * Renderer is initialized async via init()
    */
   constructor(eventManager: EventManager) {
@@ -84,43 +79,48 @@ export class WebGPURenderer {
       alphaMode: "premultiplied",
     });
 
-    // Create fullscreen quad buffer
-    this.quadVertexBuffer = WebGPURenderer.setupQuadBuffer(this.device);
-
     // Setup global resources
-    const { globalUniformBuffer, globalBindGroupLayout, globalBindGroup } = WebGPURenderer.createGlobalBuffer(this.device);
-    this.globalUniformBuffer = globalUniformBuffer;
-    this.globalBindGroupLayout = globalBindGroupLayout;
-    this.globalBindGroup = globalBindGroup;
+    this.quadVertexBuffer = WebGPURenderer.setupQuadBuffer(this.device);
+    this.globalResources = createGlobalResources(this.device);
 
-    // Setup background resources
-    const { backgroundUniformBuffer, backgroundPipeline, backgroundBindGroupLayout, backgroundPipelineLayout, backgroundBindGroup } =
-      WebGPURenderer.createBackgroundPassResources(this.device, this.format, this.globalBindGroupLayout);
-    this.backgroundUniformBuffer = backgroundUniformBuffer;
-    this.backgroundPipeline = backgroundPipeline;
-    this.backgroundBindGroupLayout = backgroundBindGroupLayout;
-    this.backgroundPipelineLayout = backgroundPipelineLayout;
-    this.backgroundBindGroup = backgroundBindGroup;
+    // Setup background and sprite pass resources
+    this.backgroundResources = createBackgroundResources(this.device, this.format, this.globalResources.bindGroupLayout, backgroundShader);
+    this.sharedSpriteResources = createSpriteResources(this.device, this.format, this.globalResources.bindGroupLayout, spriteShader);
 
-    // Setup sprite resources
-    const { sharedSpriteBindGroupLayout, sharedSpritePipelineLayout, sharedSpritePipeline, sharedSpriteBuffer } =
-      WebGPURenderer.createSharedSpriteResources(this.device, this.format, this.globalBindGroupLayout);
-    this.sharedSpriteBindGroupLayout = sharedSpriteBindGroupLayout;
-    this.sharedSpritePipelineLayout = sharedSpritePipelineLayout;
-    this.sharedSpritePipeline = sharedSpritePipeline;
-    this.sharedSpriteBuffer = sharedSpriteBuffer;
-
-    // The renderer is ready
+    // Ready to render
     this.initialised = true;
   }
 
+  /**
+   * Create a GPU sprite for the given sprite object and add it to the renderer GPU sprite map
+   */
+  public createGPUSprite = (sprite: Sprite) => {
+    if (this.gpuSprites.has(sprite.id)) {
+      console.error("GPU sprite already exists for this sprite.");
+      return;
+    }
+
+    const newGPUSprite = new GPUSprite(this.device, sprite, this.sharedSpriteResources.bindGroupLayout);
+    this.gpuSprites.set(sprite.id, newGPUSprite);
+  };
+
+  /**
+   * Remove the GPU sprite with the given ID from the renderer's GPU sprite map
+   */
+  public destroyGPUSprite = (id: SpriteID) => {
+    this.gpuSprites.delete(id);
+  };
+
+  /**
+   * Render the scene
+   */
   public render(viewport: Viewport, scene: Scene) {
     if (!this.initialised) {
       console.error("Renderer is not initialized!");
       return;
     }
 
-    // Update global uniform buffer with viewport/camera data
+    // Update global buffer with viewport/camera data
     this.uploadGlobalBuffer(viewport);
 
     // Acquire current swap chain texture and create encoder/pass
@@ -138,16 +138,16 @@ export class WebGPURenderer {
     });
 
     // Background pass
-    pass.setPipeline(this.backgroundPipeline);
-    pass.setBindGroup(0, this.globalBindGroup);
-    pass.setBindGroup(1, this.backgroundBindGroup);
+    pass.setPipeline(this.backgroundResources.pipeline);
+    pass.setBindGroup(0, this.globalResources.bindGroup);
+    pass.setBindGroup(1, this.backgroundResources.bindGroup);
     pass.setVertexBuffer(0, this.quadVertexBuffer);
     pass.draw(6);
 
     // Sprites pass
-    pass.setPipeline(this.sharedSpritePipeline);
-    pass.setBindGroup(0, this.globalBindGroup);
-    pass.setVertexBuffer(0, this.sharedSpriteBuffer);
+    pass.setPipeline(this.sharedSpriteResources.pipeline);
+    pass.setBindGroup(0, this.globalResources.bindGroup);
+    pass.setVertexBuffer(0, this.sharedSpriteResources.uniformBuffer);
 
     const sprites = scene.sprites;
     for (const sprite of sprites) {
@@ -155,9 +155,6 @@ export class WebGPURenderer {
       if (!gpuSprite) {
         throw Error(`No GPU sprite found for sprite id:${sprite.id}`);
       }
-
-      // gpuSprite.uploadSpriteTexture(this.device, gpuSprite.texture, sprite.flattenedData, sprite.width, sprite.height);
-      // gpuSprite.updateUniform(this.device, sprite.modelMatrix.data);
 
       pass.setBindGroup(1, gpuSprite.bindGroup);
       pass.draw(6);
@@ -169,32 +166,11 @@ export class WebGPURenderer {
   }
 
   /**
-   * Create a GPU sprite for the given sprite object and add it to the renderer GPU sprite map
-   */
-  public createGPUSprite = (sprite: Sprite) => {
-    if (this.gpuSprites.has(sprite.id)) {
-      console.error("GPU sprite already exists for this sprite.");
-      return;
-    }
-
-    const newGPUSprite = new GPUSprite(this.device, sprite, this.sharedSpriteBindGroupLayout);
-    this.gpuSprites.set(sprite.id, newGPUSprite);
-  };
-
-  /**
-   * Remove the GPU sprite with the given ID from the renderer's GPU sprite map
-   */
-  public destroyGPUSprite = (id: SpriteID) => {
-    this.gpuSprites.delete(id);
-  };
-
-  /**
    * Uploads global uniform buffer for the current viewport and camera
    */
   private uploadGlobalBuffer(viewport: Viewport) {
-    const cameraBufferSize = 144;
-    const globalData = new Float32Array(cameraBufferSize / 4);
     const view = viewport.getActiveView();
+    const globalData = this.globalUniformData;
 
     // Camera view projection matrix
     globalData.set(view.camera.viewProjectionMatrix.data, 0);
@@ -210,28 +186,8 @@ export class WebGPURenderer {
     globalData[34] = view.worldPerPixelX;
     globalData[35] = view.worldPerPixelY;
 
-    this.device.queue.writeBuffer(this.globalUniformBuffer, 0, globalData.buffer);
+    this.device.queue.writeBuffer(this.globalResources.uniformBuffer, 0, globalData.buffer);
   }
-
-  /**
-   * Upload pixel data to the GPU texture
-   */
-  // private uploadSpriteTexture(texture: GPUTexture, pixelData: PixelDataRGBA, width: number, height: number) {
-  //   this.device.queue.writeTexture(
-  //     { texture: texture },
-  //     pixelData as GPUAllowSharedBufferSource,
-  //     {
-  //       offset: 0,
-  //       bytesPerRow: width * 4,
-  //       rowsPerImage: height,
-  //     },
-  //     {
-  //       width: width,
-  //       height: height,
-  //       depthOrArrayLayers: 1,
-  //     }
-  //   );
-  // }
 
   // ========================================================
   // -------------- Private Static Helpers ------------------
@@ -248,267 +204,5 @@ export class WebGPURenderer {
     });
     device.queue.writeBuffer(outBuffer, 0, quadVertices);
     return outBuffer;
-  }
-
-  /**
-   * Create GPU resources for global uniforms
-   */
-  private static createGlobalBuffer(device: GPUDevice): {
-    globalUniformBuffer: GPUBuffer;
-    globalBindGroupLayout: GPUBindGroupLayout;
-    globalBindGroup: GPUBindGroup;
-  } {
-    const cameraBufferSize = 144;
-    const globalUniformBuffer = device.createBuffer({
-      size: cameraBufferSize,
-      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    });
-    const globalBindGroupLayout = device.createBindGroupLayout({
-      entries: [
-        {
-          binding: 0,
-          visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
-          buffer: { type: "uniform" },
-        },
-      ],
-    });
-    const globalBindGroup = device.createBindGroup({
-      layout: globalBindGroupLayout,
-      entries: [{ binding: 0, resource: { buffer: globalUniformBuffer } }],
-    });
-
-    return {
-      globalUniformBuffer,
-      globalBindGroupLayout,
-      globalBindGroup,
-    };
-  }
-
-  /**
-   * Create background pass GPU resources
-   */
-  private static createBackgroundPassResources(
-    device: GPUDevice,
-    format: GPUTextureFormat,
-    globalBindGroupLayout: GPUBindGroupLayout
-  ): {
-    backgroundUniformBuffer: GPUBuffer;
-    backgroundPipeline: GPURenderPipeline;
-    backgroundBindGroupLayout: GPUBindGroupLayout;
-    backgroundPipelineLayout: GPUPipelineLayout;
-    backgroundBindGroup: GPUBindGroup;
-  } {
-    const backgroundBufferSize = 48;
-
-    // Create a background buffer
-    const backgroundUniformBuffer = device.createBuffer({
-      size: backgroundBufferSize,
-      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    });
-
-    // Create shader module
-    const backgroundShaderModule = device.createShaderModule({
-      code: backgroundShader,
-      label: "Background Shader Module",
-    });
-
-    // Create bind group layout
-    const backgroundBindGroupLayout = device.createBindGroupLayout({
-      entries: [
-        {
-          binding: 0,
-          visibility: GPUShaderStage.FRAGMENT | GPUShaderStage.VERTEX,
-          buffer: { type: "uniform" },
-        },
-      ],
-    });
-
-    // Create pipeline and pipeline layout
-    const backgroundPipelineLayout = device.createPipelineLayout({
-      // Group 0: Global, Group 1: Background
-      bindGroupLayouts: [globalBindGroupLayout, backgroundBindGroupLayout],
-    });
-
-    const backgroundPipeline = device.createRenderPipeline({
-      layout: backgroundPipelineLayout,
-      vertex: {
-        module: backgroundShaderModule,
-        entryPoint: "vs_main",
-        buffers: [
-          {
-            arrayStride: 4 * 4,
-            attributes: [
-              {
-                // pos
-                shaderLocation: 0,
-                offset: 0,
-                format: "float32x2",
-              },
-              {
-                // uv
-                shaderLocation: 1,
-                offset: 8,
-                format: "float32x2",
-              },
-            ],
-          },
-        ],
-      },
-      fragment: {
-        module: backgroundShaderModule,
-        entryPoint: "fs_main",
-        targets: [{ format: format }],
-      },
-      primitive: { topology: "triangle-list" },
-    });
-
-    // Create bind group
-    const backgroundBindGroup = device.createBindGroup({
-      layout: backgroundBindGroupLayout,
-      entries: [
-        {
-          binding: 0,
-          resource: { buffer: backgroundUniformBuffer },
-        },
-      ],
-    });
-
-    // Initialise background buffer upload
-    const backgroundData = new Float32Array(backgroundBufferSize / 4);
-
-    // backgroundColor
-    backgroundData[0] = 0;
-    backgroundData[1] = 0;
-    backgroundData[2] = 0;
-    backgroundData[3] = 1;
-
-    // lineColor
-    backgroundData[4] = 0.12;
-    backgroundData[5] = 0.12;
-    backgroundData[6] = 0.12;
-    backgroundData[7] = 1.0;
-
-    // gridSize in world unit
-    backgroundData[8] = 8.0;
-    backgroundData[9] = 8.0;
-
-    // lineThickness in pixels
-    backgroundData[10] = 1;
-
-    device.queue.writeBuffer(backgroundUniformBuffer, 0, backgroundData.buffer);
-
-    return {
-      backgroundUniformBuffer,
-      backgroundPipeline,
-      backgroundBindGroupLayout,
-      backgroundPipelineLayout,
-      backgroundBindGroup,
-    };
-  }
-
-  /**
-   * Create GPU resources for the sprite rendering pass
-   */
-  private static createSharedSpriteResources(
-    device: GPUDevice,
-    format: GPUTextureFormat,
-    globalBindGroupLayout: GPUBindGroupLayout
-  ): {
-    sharedSpriteBindGroupLayout: GPUBindGroupLayout;
-    sharedSpritePipelineLayout: GPUPipelineLayout;
-    sharedSpritePipeline: GPURenderPipeline;
-    sharedSpriteBuffer: GPUBuffer;
-  } {
-    const sharedSpriteBindGroupLayout = device.createBindGroupLayout({
-      entries: [
-        {
-          // binding 0: uniform data
-          binding: 0,
-          visibility: GPUShaderStage.FRAGMENT | GPUShaderStage.VERTEX,
-          buffer: { type: "uniform" },
-        },
-        {
-          // binding 1: texture
-          binding: 1,
-          visibility: GPUShaderStage.FRAGMENT,
-          texture: {},
-        },
-        {
-          // binding 2: sampler
-          binding: 2,
-          visibility: GPUShaderStage.FRAGMENT,
-          sampler: {},
-        },
-      ],
-    });
-
-    const sharedSpritePipelineLayout = device.createPipelineLayout({
-      // Group 0: Global, Group 1: Sprite
-      bindGroupLayouts: [globalBindGroupLayout, sharedSpriteBindGroupLayout],
-    });
-
-    const spriteShaderModule = device.createShaderModule({ code: spriteShader, label: "Sprite Shader Module" });
-
-    const sharedSpritePipeline = device.createRenderPipeline({
-      layout: sharedSpritePipelineLayout,
-      vertex: {
-        module: spriteShaderModule,
-        entryPoint: "vs_main",
-        buffers: [
-          {
-            arrayStride: 4 * 4,
-            attributes: [
-              {
-                // pos
-                shaderLocation: 0,
-                offset: 0,
-                format: "float32x2",
-              },
-              {
-                // uv
-                shaderLocation: 1,
-                offset: 2 * 4,
-                format: "float32x2",
-              },
-            ],
-          },
-        ],
-      },
-      fragment: {
-        module: spriteShaderModule,
-        entryPoint: "fs_main",
-        targets: [
-          {
-            format: format,
-            blend: {
-              color: {
-                srcFactor: "src-alpha",
-                dstFactor: "one-minus-src-alpha",
-                operation: "add",
-              },
-              alpha: {
-                srcFactor: "one",
-                dstFactor: "one-minus-src-alpha",
-                operation: "add",
-              },
-            },
-          },
-        ],
-      },
-      primitive: { topology: "triangle-list" },
-    });
-    const spriteVertices = new Float32Array([0, 0, 0, 1, 1, 0, 1, 1, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0, 1, 1, 1, 1, 1, 0]);
-    const sharedSpriteBuffer = device.createBuffer({
-      size: spriteVertices.byteLength,
-      usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-    });
-    device.queue.writeBuffer(sharedSpriteBuffer, 0, spriteVertices);
-
-    return {
-      sharedSpriteBindGroupLayout,
-      sharedSpritePipelineLayout,
-      sharedSpritePipeline,
-      sharedSpriteBuffer,
-    };
   }
 }
